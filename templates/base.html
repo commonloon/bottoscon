@@ -173,6 +173,19 @@
                 margin-top: 5px;
             }
         }
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+            header, footer {
+                display: none;
+            }
+            .container {
+                box-shadow: none;
+                padding: 10px;
+            }
+        }
     </style>
     {% block extra_css %}{% endblock %}
 </head>
