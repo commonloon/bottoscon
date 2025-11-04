@@ -164,10 +164,12 @@
         body {
             background: white;
             padding: 0;
+            font-size: 11pt;
+            line-height: 1.3;
         }
         .container {
             max-width: 100%;
-            padding: 10px;
+            padding: 8px;
             box-shadow: none;
         }
         header, nav, .actions, footer, .game-count-badge {
@@ -176,92 +178,128 @@
         .player-header {
             background: none;
             color: black;
-            padding: 5px 0;
-            margin-bottom: 10px;
+            padding: 3px 0;
+            margin-bottom: 8px;
             border-bottom: 2px solid #000;
         }
         .player-header h2 {
             color: black;
-            font-size: 1.2em;
+            font-size: 14pt;
             margin: 0;
+            font-weight: bold;
         }
         .day-section {
-            margin-bottom: 10px;
+            margin-bottom: 0;
         }
         .day-header {
             background: none;
-            border-left: 3px solid #000;
-            padding: 3px 8px;
-            margin-bottom: 5px;
-            font-size: 1em;
+            border: none;
+            padding: 0;
+            margin: 8px 0 3px 0;
+            font-size: 11pt;
             color: black;
+            font-weight: bold;
         }
         .day-header::before {
             content: none;
         }
         .game-card {
-            border: 1px solid #333;
+            border: none;
             border-radius: 0;
-            padding: 8px;
-            margin-bottom: 8px;
+            padding: 0;
+            margin-bottom: 6px;
             break-inside: avoid;
             page-break-inside: avoid;
         }
         .game-header {
-            margin-bottom: 5px;
+            margin-bottom: 1px;
+            display: block;
         }
         .game-title {
-            font-size: 1em;
+            font-size: 10pt;
             font-weight: bold;
+            display: inline;
         }
         .game-id {
-            background: #ddd;
+            background: none;
             color: #000;
-            padding: 2px 6px;
-            font-size: 0.75em;
+            padding: 0;
+            font-size: 9pt;
+            display: inline;
+            font-weight: normal;
+        }
+        .game-id::before {
+            content: " (#";
+        }
+        .game-id::after {
+            content: ")";
         }
         .game-details {
-            grid-template-columns: repeat(2, 1fr);
-            gap: 5px;
-            margin-bottom: 5px;
-            font-size: 0.85em;
+            display: block;
+            margin: 1px 0;
+            font-size: 9pt;
+            line-height: 1.2;
         }
         .detail-item {
-            gap: 4px;
+            display: inline;
+            margin-right: 12px;
+        }
+        .detail-item:last-child {
+            margin-right: 0;
         }
         .detail-icon {
             display: none;
         }
         .detail-label {
-            font-size: 0.85em;
+            font-size: 9pt;
+        }
+        .detail-value {
+            font-weight: normal;
+        }
+        /* Hide duration entirely in print */
+        .detail-duration {
+            display: none !important;
         }
         .status-badge {
-            padding: 2px 6px;
-            font-size: 0.75em;
+            padding: 1px 4px;
+            font-size: 8pt;
+            border: 1px solid #666;
+            background: none;
         }
         .players-section {
-            margin-top: 5px;
-            padding-top: 5px;
-            border-top: 1px solid #ccc;
+            margin-top: 1px;
+            padding-top: 0;
+            border-top: none;
+            font-size: 9pt;
+            line-height: 1.2;
         }
         .players-label {
-            font-size: 0.8em;
-            margin-bottom: 3px;
+            display: inline;
+            font-size: 9pt;
+            margin: 0;
+            font-weight: normal;
         }
         .players-list {
-            gap: 4px;
+            display: inline;
         }
         .player-tag {
-            background: #f0f0f0;
-            padding: 2px 6px;
-            font-size: 0.75em;
-            border: 1px solid #ccc;
+            background: none;
+            padding: 0;
+            font-size: 9pt;
+            border: none;
+            display: inline;
+        }
+        .player-tag::after {
+            content: ", ";
+        }
+        .player-tag:last-child::after {
+            content: "";
         }
         .player-tag.current-player {
-            background: #ddd;
+            background: none;
             color: #000;
             font-weight: bold;
-            border: 1px solid #000;
+            border: none;
         }
         h1, h2, h3 {
             page-break-after: avoid;
@@ -303,7 +341,7 @@
                 </div>
 
                 {% if game.duration %}
-                <div class="detail-item">
+                <div class="detail-item detail-duration">
                     <span class="detail-icon">⏱️</span>
                     <span class="detail-value">{{ game.duration }}</span>
                 </div>
