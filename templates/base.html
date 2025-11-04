@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}BottosCon Schedule{% endblock %}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            padding: 30px;
+        }
+        header {
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+        h1 {
+            color: #667eea;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        h2 {
+            color: #764ba2;
+            margin-top: 20px;
+            margin-bottom: 15px;
+        }
+        .subtitle {
+            color: #666;
+            font-size: 1.1em;
+        }
+        nav {
+            margin-top: 15px;
+        }
+        nav a {
+            color: #667eea;
+            text-decoration: none;
+            margin-right: 20px;
+            font-weight: 500;
+        }
+        nav a:hover {
+            text-decoration: underline;
+        }
+        .content {
+            margin-top: 20px;
+        }
+        footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+            text-align: center;
+            color: #666;
+            font-size: 0.9em;
+        }
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+            .container {
+                padding: 15px;
+            }
+            h1 {
+                font-size: 1.8em;
+            }
+        }
+    </style>
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎲 BottosCon Schedule</h1>
+            <p class="subtitle">Your Personal Game Convention Schedule</p>
+            <nav>
+                <a href="{{ url_for('index') }}">🏠 All Players</a>
+                <a href="{{ url_for('all_games') }}">📋 All Games</a>
+            </nav>
+        </header>
+
+        <div class="content">
+            {% block content %}{% endblock %}
+        </div>
+
+        <footer>
+            <p>Data refreshes every 5 minutes from the signup sheet</p>
+            <p>Having issues? Check that the Google Sheet is publicly accessible</p>
+        </footer>
+    </div>
+</body>
+</html>

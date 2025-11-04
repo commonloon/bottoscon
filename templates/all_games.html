@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+
+{% block title %}All Games - BottosCon{% endblock %}
+
+{% block extra_css %}
+<style>
+    .stats {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 20px;
+        border-radius: 8px;
+        margin-bottom: 30px;
+    }
+    .day-section {
+        margin-bottom: 30px;
+    }
+    .day-header {
+        background: #f0f4ff;
+        padding: 12px 20px;
+        border-left: 4px solid #667eea;
+        margin-bottom: 15px;
+        font-weight: 600;
+        color: #667eea;
+        font-size: 1.3em;
+    }
+    .game-card {
+        background: white;
+        border: 2px solid #e0e0e0;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 15px;
+    }
+    .game-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: start;
+        margin-bottom: 15px;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+    .game-title {
+        font-size: 1.3em;
+        font-weight: 600;
+        color: #333;
+        flex: 1;
+    }
+    .game-id {
+        background: #667eea;
+        color: white;
+        padding: 4px 12px;
+        border-radius: 15px;
+        font-size: 0.85em;
+        font-weight: 600;
+    }
+    .game-details {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
+        margin-bottom: 15px;
+    }
+    .detail-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .detail-value {
+        color: #333;
+    }
+    .status-badge {
+        display: inline-block;
+        padding: 5px 12px;
+        border-radius: 15px;
+        font-size: 0.85em;
+        font-weight: 600;
+    }
+    .status-FULL {
+        background: #fee;
+        color: #c33;
+    }
+    .status-OPEN {
+        background: #efe;
+        color: #3c3;
+    }
+    .players-section {
+        margin-top: 15px;
+        padding-top: 15px;
+        border-top: 1px solid #e0e0e0;
+    }
+    .players-label {
+        font-size: 0.9em;
+        color: #666;
+        margin-bottom: 8px;
+        font-weight: 600;
+    }
+    .players-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    .player-tag {
+        background: #f5f5f5;
+        padding: 5px 12px;
+        border-radius: 15px;
+        font-size: 0.85em;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="stats">
+    <h2 style="color: white; margin: 0 0 10px 0;">📋 All Games</h2>
+    <div>🎮 {{ games|length }} total games scheduled</div>
+</div>
+
+{% if games %}
+    {% set current_day = namespace(value='') %}
+    {% for game in games %}
+        {% if game.start_day != current_day.value %}
+            {% if not loop.first %}
+                </div>
+            {% endif %}
+            {% set current_day.value = game.start_day %}
+            <div class="day-section">
+                <div class="day-header">📅 {{ game.start_day }}</div>
+        {% endif %}
+
+        <div class="game-card">
+            <div class="game-header">
+                <div class="game-title">{{ game.name }}</div>
+                <div class="game-id">Game #{{ game.id }}</div>
+            </div>
+
+            <div class="game-details">
+                <div class="detail-item">
+                    <span>🕐</span>
+                    <span class="detail-value">{{ game.start_time }} - {{ game.end_time }}</span>
+                </div>
+
+                {% if game.duration %}
+                <div class="detail-item">
+                    <span>⏱️</span>
+                    <span class="detail-value">{{ game.duration }}</span>
+                </div>
+                {% endif %}
+
+                {% if game.table %}
+                <div class="detail-item">
+                    <span>🪑</span>
+                    <span class="detail-value">Table {{ game.table }}</span>
+                </div>
+                {% endif %}
+
+                {% if game.status %}
+                <div class="detail-item">
+                    <span class="status-badge status-{{ game.status }}">{{ game.status }}</span>
+                </div>
+                {% endif %}
+            </div>
+
+            {% if game.players %}
+            <div class="players-section">
+                <div class="players-label">👥 Players ({{ game.players|length }}):</div>
+                <div class="players-list">
+                    {% for player in game.players %}
+                    <span class="player-tag">{{ player }}</span>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        {% if loop.last %}
+            </div>
+        {% endif %}
+    {% endfor %}
+{% endif %}
+{% endblock %}
