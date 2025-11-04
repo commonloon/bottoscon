@@ -57,6 +57,92 @@
         nav a:hover {
             text-decoration: underline;
         }
+        .refresh-section {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .refresh-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 5px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: background 0.2s;
+        }
+        .refresh-btn:hover {
+            background: #5568d3;
+        }
+        .refresh-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .info-icon {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 20px;
+            height: 20px;
+            background: #667eea;
+            color: white;
+            border-radius: 50%;
+            font-size: 0.8em;
+            font-weight: bold;
+            cursor: help;
+            user-select: none;
+        }
+        .info-icon:hover {
+            background: #5568d3;
+        }
+        .tooltip {
+            position: absolute;
+            background: #333;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 5px;
+            font-size: 0.85em;
+            white-space: normal;
+            width: 250px;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            display: none;
+            font-weight: normal;
+        }
+        .tooltip::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 8px solid transparent;
+            border-top-color: #333;
+        }
+        .info-icon:hover .tooltip {
+            display: block;
+        }
+        .refresh-message {
+            display: inline-block;
+            margin-left: 10px;
+            padding: 5px 12px;
+            border-radius: 5px;
+            font-size: 0.9em;
+            font-weight: 500;
+        }
+        .refresh-message.success {
+            background: #d4edda;
+            color: #155724;
+        }
+        .refresh-message.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
         .content {
             margin-top: 20px;
         }
@@ -78,6 +164,14 @@
             h1 {
                 font-size: 1.8em;
             }
+            nav {
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+            }
+            .refresh-section {
+                margin-top: 5px;
+            }
         }
     </style>
     {% block extra_css %}{% endblock %}
@@ -90,6 +184,14 @@
             <nav>
                 <a href="{{ url_for('index') }}">🏠 All Players</a>
                 <a href="{{ url_for('all_games') }}">📋 All Games</a>
+                <div class="refresh-section">
+                    <button id="refreshBtn" class="refresh-btn">🔄 Update Schedule</button>
+                    <div class="info-icon">
+                        i
+                        <div class="tooltip">Click this button if you need to see schedule changes that have occurred within the past hour.</div>
+                    </div>
+                    <span id="refreshMessage" class="refresh-message" style="display: none;"></span>
+                </div>
             </nav>
         </header>
 
@@ -98,9 +200,58 @@
         </div>
 
         <footer>
-            <p>Data refreshes every 5 minutes from the signup sheet</p>
+            <p>Data refreshes every hour from the signup sheet</p>
             <p>Having issues? Check that the Google Sheet is publicly accessible</p>
         </footer>
     </div>
+
+    <script>
+        document.getElementById('refreshBtn').addEventListener('click', function() {
+            const btn = this;
+            const message = document.getElementById('refreshMessage');
+
+            // Disable button during refresh
+            btn.disabled = true;
+            btn.textContent = '🔄 Updating...';
+            message.style.display = 'none';
+
+            // Call the refresh API
+            fetch('/api/refresh-cache', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    message.textContent = '✓ Schedule updated!';
+                    message.className = 'refresh-message success';
+                    message.style.display = 'inline-block';
+
+                    // Reload the page after a short delay to show updated data
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                } else {
+                    throw new Error(data.message || 'Update failed');
+                }
+            })
+            .catch(error => {
+                message.textContent = '✗ Update failed: ' + error.message;
+                message.className = 'refresh-message error';
+                message.style.display = 'inline-block';
+
+                // Re-enable button
+                btn.disabled = false;
+                btn.textContent = '🔄 Update Schedule';
+
+                // Hide error message after 5 seconds
+                setTimeout(() => {
+                    message.style.display = 'none';
+                }, 5000);
+            });
+        });
+    </script>
 </body>
 </html>

@@ -7,7 +7,7 @@ import io
 import re
 from collections import defaultdict
 from datetime import datetime
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, render_template, request, redirect, url_for, jsonify
 import requests
 
 app = Flask(__name__)
@@ -15,21 +15,21 @@ app = Flask(__name__)
 # Google Sheets CSV export URL
 SIGNUP_SHEET_URL = "https://docs.google.com/spreadsheets/d/1GZX_Nxs-eWcV9JRYwVO4jH8jEnMJvGDlwKevCtyAkjg/export?format=csv&gid=1882561680"
 
-# Cache for sheet data (refresh every 5 minutes)
+# Cache for sheet data (refresh every hour)
 _cache = {
     'data': None,
     'timestamp': None
 }
-CACHE_DURATION = 300  # 5 minutes
+CACHE_DURATION = 3600  # 1 hour
 
 
-def fetch_sheet_data():
+def fetch_sheet_data(force_refresh=False):
     """Fetch and cache the signup sheet data"""
     import time
     now = time.time()
 
-    # Return cached data if still fresh
-    if _cache['data'] and _cache['timestamp'] and (now - _cache['timestamp']) < CACHE_DURATION:
+    # Return cached data if still fresh (unless force refresh)
+    if not force_refresh and _cache['data'] and _cache['timestamp'] and (now - _cache['timestamp']) < CACHE_DURATION:
         return _cache['data']
 
     # Fetch fresh data
@@ -164,6 +164,16 @@ def all_games():
         return render_template('all_games.html', games=games)
     except Exception as e:
         return f"Error loading games: {str(e)}", 500
+
+
+@app.route('/api/refresh-cache', methods=['POST'])
+def refresh_cache():
+    """Force refresh the cache"""
+    try:
+        fetch_sheet_data(force_refresh=True)
+        return jsonify({'success': True, 'message': 'Schedule data refreshed successfully'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Error refreshing: {str(e)}'}), 500
 
 
 if __name__ == '__main__':

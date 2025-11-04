@@ -13,7 +13,8 @@ This app allows **all players to view their personal schedules concurrently** wi
 - **Personal Schedule View**: Each player gets a unique URL to view only their games
 - **Searchable Player List**: Home page with search to quickly find any player
 - **All Games View**: See the complete convention schedule
-- **Auto-refresh**: Data refreshes from the Google Sheet every 5 minutes
+- **Auto-refresh**: Data refreshes from the Google Sheet every hour
+- **Manual Update**: "Update Schedule" button with tooltip to force immediate refresh
 - **Mobile-friendly**: Responsive design works on phones and tablets
 - **Printable**: Print button for physical schedule copies
 - **No Authentication Required**: Uses public Google Sheets CSV export
@@ -123,10 +124,10 @@ To get the correct URL:
 
 ### Adjusting Cache Duration
 
-By default, the app caches data for 5 minutes to reduce Google Sheets API calls. To change:
+By default, the app caches data for 1 hour to reduce Google Sheets API calls. Users can manually refresh using the "Update Schedule" button on any page. To change the cache duration:
 
 ```python
-CACHE_DURATION = 300  # seconds (300 = 5 minutes)
+CACHE_DURATION = 3600  # seconds (3600 = 1 hour)
 ```
 
 ## Cost Estimate
@@ -210,14 +211,15 @@ bottoscon/
 2. Parses CSV to extract games and player signups (columns 23-31)
 3. Builds an index of which games each player is in
 4. Serves personalized views via Flask routes
-5. Caches data for 5 minutes to avoid hitting Google too frequently
+5. Caches data for 1 hour to avoid hitting Google too frequently
+6. Users can force refresh via "Update Schedule" button at any time
 
 ### Data Flow
 
 ```
 Google Sheet → CSV Export → Flask Parser → Player Index → Web Views
-                  ↓
-              Cache (5 min)
+                  ↓                              ↑
+              Cache (1 hour)          Manual Refresh Button
 ```
 
 ### Player Name Extraction
