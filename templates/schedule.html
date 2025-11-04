@@ -204,15 +204,15 @@
             content: none;
         }
         .game-card {
-            border: none;
+            border: 1px solid #000;
             border-radius: 0;
-            padding: 0;
+            padding: 4px 6px;
             margin-bottom: 6px;
             break-inside: avoid;
             page-break-inside: avoid;
         }
         .game-header {
-            margin-bottom: 1px;
+            margin-bottom: 0;
             display: block;
         }
         .game-title {
@@ -236,16 +236,19 @@
         }
         .game-details {
             display: block;
-            margin: 1px 0;
+            margin: 0;
             font-size: 9pt;
             line-height: 1.2;
         }
         .detail-item {
             display: inline;
-            margin-right: 12px;
-        }
-        .detail-item:last-child {
             margin-right: 0;
+        }
+        .detail-item::before {
+            content: " | ";
+        }
+        .detail-item:first-child::before {
+            content: "";
         }
         .detail-icon {
             display: none;
@@ -261,14 +264,15 @@
             display: none !important;
         }
         .status-badge {
-            padding: 1px 4px;
-            font-size: 8pt;
-            border: 1px solid #666;
+            padding: 0;
+            font-size: 9pt;
+            border: none;
             background: none;
         }
         .players-section {
-            margin-top: 1px;
-            padding-top: 0;
+            display: block;
+            margin: 0;
+            padding: 0;
             border-top: none;
             font-size: 9pt;
             line-height: 1.2;
