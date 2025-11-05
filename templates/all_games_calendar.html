@@ -110,33 +110,113 @@
         background: #5568d3;
     }
     @media print {
-        body {
-            background: white;
+        * {
+            box-sizing: border-box;
+        }
+        html, body {
+            width: 8.5in;
+            height: 11in;
+            margin: 0;
             padding: 0;
+            background: white;
+        }
+        body {
+            font-size: 10pt;
         }
         .container {
-            max-width: 100%;
-            padding: 8px;
+            width: 8.5in;
+            height: 11in;
+            margin: 0;
+            padding: 0.35in;
             box-shadow: none;
+            border-radius: 0;
+            display: flex;
+            flex-direction: column;
         }
         header, nav, .game-count-badge, .day-tabs, .legend {
             display: none;
         }
         .actions {
-            display: block;
+            display: none;
         }
         .page-header {
             background: none;
             color: black;
-            padding: 3px 0;
-            margin-bottom: 8px;
+            padding: 0 0 6px 0;
+            margin: 0 0 6px 0;
             border-bottom: 2px solid #000;
+            flex-shrink: 0;
         }
         .page-header h2 {
             color: black;
-            font-size: 14pt;
+            font-size: 12pt;
             margin: 0;
             font-weight: bold;
+        }
+        .content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        #calendar {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            flex: 1;
+        }
+        /* FullCalendar print overrides */
+        .fc {
+            width: 100% !important;
+            height: 100% !important;
+            font-size: 7.5pt !important;
+        }
+        .fc-timegrid {
+            border: 1px solid #999;
+        }
+        .fc .fc-col-header {
+            background: #f5f5f5;
+            padding: 2px 0;
+            border: 1px solid #999;
+            font-size: 8pt !important;
+        }
+        .fc .fc-daygrid-day,
+        .fc .fc-timegrid-cell {
+            border: 1px solid #ccc;
+        }
+        .fc-event {
+            margin: 0 !important;
+            padding: 0.5px !important;
+            font-size: 6.5pt !important;
+        }
+        .fc-event-title {
+            font-weight: 600;
+            font-size: 6.5pt !important;
+        }
+        .fc .fc-button {
+            display: none;
+        }
+        .fc .fc-toolbar {
+            display: none;
+        }
+        .fc-view-harness {
+            width: 100%;
+            height: 100%;
+        }
+        .fc-daygrid,
+        .fc-timegrid {
+            width: 100%;
+            height: 100%;
+        }
+        .fc-scroller {
+            overflow: visible !important;
+            height: auto !important;
+        }
+        .fc-timegrid-body {
+            overflow: visible !important;
+        }
+        .fc-col-time {
+            width: 50px !important;
         }
     }
 </style>
@@ -178,7 +258,6 @@
 
 <div class="actions">
     <a href="{{ url_for('all_games') }}" class="btn">📋 List View</a>
-    <button onclick="window.print()" class="btn" style="margin-left: 10px; background: #764ba2; border: none; cursor: pointer;">🖨️ Print Calendar</button>
 </div>
 
 <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js'></script>
@@ -273,9 +352,16 @@
                 tooltipText += `\nStatus: ${props.status || 'Unknown'}`;
                 tooltipText += `\nPlayers: ${props.playerCount}`;
 
-                return {
-                    html: `<div class="fc-event-main" title="${tooltipText}" style="color: black; font-weight: 600;">${arg.event.title}<br><small style="color: black;">${startTime} - ${endTime}</small></div>`
-                };
+                // Display: Game title (large), then times, then table ID
+                let html = `<div class="fc-event-main" title="${tooltipText}" style="color: black; font-weight: 600;">
+                    <strong>${arg.event.title}</strong><br>
+                    <small>${startTime} - ${endTime}</small>`;
+                if (props.table) {
+                    html += `<br><small>Table ${props.table}</small>`;
+                }
+                html += '</div>';
+
+                return { html };
             }
         });
 
