@@ -1,0 +1,290 @@
+{% extends "base.html" %}
+
+{% block title %}All Games Calendar{% endblock %}
+
+{% block nav_items %}
+<a href="{{ url_for('all_games_calendar') }}">📅 Calendar</a>
+{% endblock %}
+
+{% block extra_css %}
+<link href='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.css' rel='stylesheet' />
+<style>
+    .page-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 25px;
+        border-radius: 8px;
+        margin-bottom: 30px;
+    }
+    .page-header h2 {
+        color: white;
+        margin: 0 0 10px 0;
+        font-size: 2em;
+    }
+    .game-count-badge {
+        background: rgba(255,255,255,0.2);
+        padding: 8px 15px;
+        border-radius: 20px;
+        display: inline-block;
+        font-size: 0.9em;
+    }
+    .day-tabs {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 20px;
+        border-bottom: 2px solid #ddd;
+    }
+    .day-tab {
+        padding: 12px 24px;
+        background: #f5f5f5;
+        border: none;
+        border-bottom: 3px solid transparent;
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 1em;
+        transition: all 0.2s;
+    }
+    .day-tab:hover {
+        background: #e0e0e0;
+    }
+    .day-tab.active {
+        background: white;
+        border-bottom-color: #667eea;
+        color: #667eea;
+    }
+    #calendar {
+        margin-top: 20px;
+        min-height: 600px;
+    }
+    /* Make time slots taller for single-day view */
+    .fc .fc-timegrid-slot {
+        height: 3em;
+    }
+    .fc-event.status-OPEN {
+        background-color: #d4edda !important;
+        border-color: #28a745 !important;
+    }
+    .fc-event.status-OPEN .fc-event-title {
+        color: #155724;
+    }
+    .fc-event.status-FULL {
+        background-color: #f8d7da !important;
+        border-color: #dc3545 !important;
+    }
+    .fc-event.status-FULL .fc-event-title {
+        color: #721c24;
+    }
+    .legend {
+        display: flex;
+        gap: 20px;
+        margin-top: 20px;
+        font-size: 0.9em;
+    }
+    .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .legend-color {
+        width: 20px;
+        height: 20px;
+        border: 1px solid #333;
+        border-radius: 2px;
+    }
+    .actions {
+        margin-top: 30px;
+        padding-top: 20px;
+        border-top: 1px solid #e0e0e0;
+    }
+    .btn {
+        display: inline-block;
+        padding: 12px 24px;
+        background: #667eea;
+        color: white;
+        text-decoration: none;
+        border-radius: 5px;
+        font-weight: 600;
+        transition: background 0.2s;
+    }
+    .btn:hover {
+        background: #5568d3;
+    }
+    @media print {
+        body {
+            background: white;
+            padding: 0;
+        }
+        .container {
+            max-width: 100%;
+            padding: 8px;
+            box-shadow: none;
+        }
+        header, nav, .game-count-badge, .day-tabs, .legend {
+            display: none;
+        }
+        .actions {
+            display: block;
+        }
+        .page-header {
+            background: none;
+            color: black;
+            padding: 3px 0;
+            margin-bottom: 8px;
+            border-bottom: 2px solid #000;
+        }
+        .page-header h2 {
+            color: black;
+            font-size: 14pt;
+            margin: 0;
+            font-weight: bold;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Convention Schedule - All Games</h2>
+    <div class="game-count-badge">🎮 {{ games|length }} games total</div>
+</div>
+
+<div class="day-tabs">
+    <button class="day-tab active" data-day="Thursday" onclick="switchDay(event, 'Thursday')">
+        Thursday
+    </button>
+    <button class="day-tab" data-day="Friday" onclick="switchDay(event, 'Friday')">
+        Friday
+    </button>
+    <button class="day-tab" data-day="Saturday" onclick="switchDay(event, 'Saturday')">
+        Saturday
+    </button>
+    <button class="day-tab" data-day="Sunday" onclick="switchDay(event, 'Sunday')">
+        Sunday
+    </button>
+</div>
+
+<div class="legend">
+    <div class="legend-item">
+        <div class="legend-color" style="background: #d4edda;"></div>
+        <span>Open (has space)</span>
+    </div>
+    <div class="legend-item">
+        <div class="legend-color" style="background: #f8d7da;"></div>
+        <span>Full (no space)</span>
+    </div>
+</div>
+
+<div id='calendar'></div>
+
+<div class="actions">
+    <a href="{{ url_for('all_games') }}" class="btn">📋 List View</a>
+    <button onclick="window.print()" class="btn" style="margin-left: 10px; background: #764ba2; border: none; cursor: pointer;">🖨️ Print Calendar</button>
+</div>
+
+<script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js'></script>
+<script>
+    let calendar;
+    let currentDay = 'Thursday';
+
+    // Date mapping (generated from server config)
+    const dayMap = {
+        'Thursday': '{{ get_convention_date("Thursday") }}',
+        'Friday': '{{ get_convention_date("Friday") }}',
+        'Saturday': '{{ get_convention_date("Saturday") }}',
+        'Sunday': '{{ get_convention_date("Sunday") }}'
+    };
+
+    const games = {{ games|tojson }};
+
+    // Convert games to FullCalendar events
+    const allEvents = games.map(game => {
+        const dayStr = game.start_day;
+        const startTimeStr = game.start_time;
+        const endTimeStr = game.end_time;
+
+        const startDate = dayMap[dayStr];
+        const endDate = dayMap[game.end_day] || startDate;
+
+        return {
+            title: game.name,
+            start: `${startDate}T${startTimeStr}:00`,
+            end: `${endDate}T${endTimeStr}:00`,
+            classNames: [`status-${game.status || 'UNKNOWN'}`],
+            extendedProps: {
+                table: game.table,
+                status: game.status,
+                playerCount: game.players.length,
+                players: game.players,
+                dayName: dayStr
+            }
+        };
+    });
+
+    function switchDay(e, day) {
+        // Update active tab
+        document.querySelectorAll('.day-tab').forEach(tab => tab.classList.remove('active'));
+        e.target.classList.add('active');
+        currentDay = day;
+
+        // Recreate calendar with events for the selected day
+        updateCalendarForDay(day);
+    }
+
+    function updateCalendarForDay(day) {
+        const calendarEl = document.getElementById('calendar');
+
+        // Destroy existing calendar if it exists
+        if (calendar) {
+            calendar.destroy();
+        }
+
+        // Filter events for the selected day
+        const dayEvents = allEvents.filter(event => {
+            return event.extendedProps.dayName === day;
+        });
+
+        // Create new calendar
+        calendar = new FullCalendar.Calendar(calendarEl, {
+            initialDate: dayMap[day],
+            initialView: 'timeGridDay',
+            headerToolbar: {
+                left: 'title',
+                center: '',
+                right: ''
+            },
+            slotLabelInterval: '00:30',
+            slotLabelFormat: {
+                hour: 'numeric',
+                minute: '2-digit',
+                meridiem: 'short',
+                omitZeroMinute: false
+            },
+            slotMinTime: '09:00',
+            slotMaxTime: '24:00',
+            events: dayEvents,
+            eventContent: function(arg) {
+                const props = arg.event.extendedProps;
+                const startTime = arg.event.start.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                const endTime = arg.event.end.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+
+                // Build tooltip text with all game info
+                let tooltipText = `${arg.event.title}\n${startTime} - ${endTime}`;
+                if (props.table) tooltipText += `\nTable: ${props.table}`;
+                tooltipText += `\nStatus: ${props.status || 'Unknown'}`;
+                tooltipText += `\nPlayers: ${props.playerCount}`;
+
+                return {
+                    html: `<div class="fc-event-main" title="${tooltipText}" style="color: black; font-weight: 600;">${arg.event.title}<br><small style="color: black;">${startTime} - ${endTime}</small></div>`
+                };
+            }
+        });
+
+        calendar.render();
+    }
+
+    // Initialize with Thursday
+    document.addEventListener('DOMContentLoaded', function() {
+        updateCalendarForDay('Thursday');
+    });
+</script>
+{% endblock %}

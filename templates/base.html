@@ -197,6 +197,7 @@
             <nav>
                 <a href="{{ url_for('index') }}">🏠 All Players</a>
                 <a href="{{ url_for('all_games') }}">📋 All Games</a>
+                {% block nav_items %}{% endblock %}
                 <div class="refresh-section">
                     <button id="refreshBtn" class="refresh-btn">🔄 Update Schedule</button>
                     <div class="info-icon" title="Click this button if you need to see schedule changes that have occurred within the past hour.">

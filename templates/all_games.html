@@ -2,6 +2,10 @@
 
 {% block title %}All Games - BottosCon{% endblock %}
 
+{% block nav_items %}
+<a href="{{ url_for('all_games_calendar') }}">📅 Calendar</a>
+{% endblock %}
+
 {% block extra_css %}
 <style>
     .stats {

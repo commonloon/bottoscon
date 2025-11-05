@@ -6,9 +6,10 @@ import csv
 import io
 import re
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timedelta
 from flask import Flask, render_template, request, redirect, url_for, jsonify
 import requests
+from config import CONVENTION_START_DATE, CONVENTION_DAYS
 
 app = Flask(__name__)
 
@@ -21,6 +22,16 @@ _cache = {
     'timestamp': None
 }
 CACHE_DURATION = 3600  # 1 hour
+
+
+def get_convention_date(day_name):
+    """
+    Convert a day name (e.g., 'Thursday') to an actual date based on CONVENTION_START_DATE.
+    Returns ISO format date string (YYYY-MM-DD).
+    """
+    offset = CONVENTION_DAYS.get(day_name, 0)
+    actual_date = CONVENTION_START_DATE + timedelta(days=offset)
+    return actual_date.strftime('%Y-%m-%d')
 
 
 def fetch_sheet_data(force_refresh=False):
@@ -155,6 +166,24 @@ def player_schedule(player_name):
         return f"Error loading schedule: {str(e)}", 500
 
 
+@app.route('/calendar/<player_name>')
+def player_calendar(player_name):
+    """Show calendar view for a specific player"""
+    try:
+        _, player_games = parse_games_and_players()
+
+        if player_name not in player_games:
+            return f"Player '{player_name}' not found", 404
+
+        games = sort_games_chronologically(player_games[player_name])
+        return render_template('calendar.html',
+                             player_name=player_name,
+                             games=games,
+                             get_convention_date=get_convention_date)
+    except Exception as e:
+        return f"Error loading calendar: {str(e)}", 500
+
+
 @app.route('/all-games')
 def all_games():
     """Show all games"""
@@ -164,6 +193,19 @@ def all_games():
         return render_template('all_games.html', games=games)
     except Exception as e:
         return f"Error loading games: {str(e)}", 500
+
+
+@app.route('/calendar/all-games')
+def all_games_calendar():
+    """Show calendar view for all games"""
+    try:
+        games, _ = parse_games_and_players()
+        games = sort_games_chronologically(games)
+        return render_template('all_games_calendar.html',
+                             games=games,
+                             get_convention_date=get_convention_date)
+    except Exception as e:
+        return f"Error loading calendar: {str(e)}", 500
 
 
 @app.route('/api/refresh-cache', methods=['POST'])

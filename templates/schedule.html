@@ -2,6 +2,10 @@
 
 {% block title %}{{ player_name }}'s Schedule{% endblock %}
 
+{% block nav_items %}
+<a href="{{ url_for('player_calendar', player_name=player_name) }}">📅 Calendar</a>
+{% endblock %}
+
 {% block extra_css %}
 <style>
     .player-header {
