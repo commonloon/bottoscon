@@ -278,16 +278,33 @@
     // Convert games to FullCalendar events
     const allEvents = games.map(game => {
         const dayStr = game.start_day;
-        const startTimeStr = game.start_time;
-        const endTimeStr = game.end_time;
+        let startTimeStr = game.start_time;
+        let endTimeStr = game.end_time;
+
+        // Normalize time format: if time doesn't have seconds, add them
+        // Handle formats like "09:00", "09:00:00", etc.
+        const formatTime = (timeStr) => {
+            const parts = timeStr.split(':');
+            if (parts.length === 2) {
+                // HH:MM format - add :00 for seconds
+                return `${timeStr}:00`;
+            } else if (parts.length === 3) {
+                // HH:MM:SS format - use as is
+                return timeStr;
+            }
+            return timeStr; // Fallback
+        };
+
+        startTimeStr = formatTime(startTimeStr);
+        endTimeStr = formatTime(endTimeStr);
 
         const startDate = dayMap[dayStr];
         const endDate = dayMap[game.end_day] || startDate;
 
         return {
             title: game.name,
-            start: `${startDate}T${startTimeStr}:00`,
-            end: `${endDate}T${endTimeStr}:00`,
+            start: `${startDate}T${startTimeStr}`,
+            end: `${endDate}T${endTimeStr}`,
             classNames: [`status-${game.status || 'UNKNOWN'}`],
             extendedProps: {
                 table: game.table,
