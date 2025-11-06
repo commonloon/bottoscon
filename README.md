@@ -2,7 +2,11 @@
 
 A Flask web application that solves the concurrent viewing problem for board game convention schedules stored in Google Sheets.
 
-## Problem Solved
+## CAUTION
+<em>All the code and documentation for at least the first version of this app was written by Claude.ai based on prompts from Harvey Dueck.
+Claude is a great coding tool, but it has a tendency to overstate things, e.g. claiming that untested code is complete and that minimal tests are "comprehensive".  Take all such value judgements with a large grain of salt.
+</em>
+## Purpose
 
 The convention uses a shared Google Sheet for personal schedules with a dropdown in cell B1 to select which player's schedule to display. This means only one person can view their schedule at a time - if someone else changes the dropdown, everyone's view changes.
 
