@@ -15,12 +15,16 @@ This app allows **all players to view their personal schedules concurrently** wi
 ## Features
 
 - **Personal Schedule View**: Each player gets a unique URL to view only their games
+  - **List View**: Detailed game information grouped by day
+  - **Calendar View**: Visual 4-day timeline with color-coded game status
 - **Searchable Player List**: Home page with search to quickly find any player
 - **All Games View**: See the complete convention schedule
+  - **List View**: Complete game listings grouped by day
+  - **Calendar View**: Day-by-day visual calendar with tabbed navigation
 - **Auto-refresh**: Data refreshes from the Google Sheet every hour
 - **Manual Update**: "Update Schedule" button with tooltip to force immediate refresh
 - **Mobile-friendly**: Responsive design works on phones and tablets
-- **Printable**: Print button for physical schedule copies
+- **Printable Schedules**: Print button on player list view for physical copies
 - **No Authentication Required**: Uses public Google Sheets CSV export
 
 ## Architecture
@@ -32,6 +36,29 @@ Flask App (Cloud Run)
         ↓
 Player Views (concurrent access)
 ```
+
+## Views
+
+The app provides two complementary views for schedules:
+
+### List View
+- Detailed game information cards
+- Grouped by day (Thursday → Sunday)
+- Shows complete player lists, table assignments, and timing
+- Print button available for personal schedules
+- Best for: Detailed reference, printing
+
+### Calendar View
+- Visual timeline using FullCalendar library
+- Color-coded game status:
+  - **Green**: OPEN (has available spots)
+  - **Red**: FULL (no available spots)
+- Player calendar: 4-day view showing all convention days
+- All-games calendar: Single-day view with tab navigation (Thursday/Friday/Saturday/Sunday)
+- Print-friendly via browser's native print function (Ctrl+P / Cmd+P)
+- Best for: Visual scheduling, time management, spotting conflicts
+
+**Navigation**: Each view has links to switch between list and calendar formats.
 
 ## Quick Start - Local Development
 
@@ -48,6 +75,7 @@ Player Views (concurrent access)
 3. **Open browser**:
    - Navigate to `http://localhost:8080`
    - Search for your name and click to see your schedule
+   - Toggle between list and calendar views using the navigation links
 
 ## Deployment to Google Cloud Run
 
@@ -179,32 +207,38 @@ Google Cloud Run pricing (as of 2024):
 Edit the CSS in the `<style>` blocks in:
 - `templates/base.html` - Overall theme
 - `templates/index.html` - Player list page
-- `templates/schedule.html` - Individual schedules
-- `templates/all_games.html` - All games view
+- `templates/schedule.html` - Individual player schedule (list view)
+- `templates/calendar.html` - Individual player schedule (calendar view)
+- `templates/all_games.html` - All games (list view)
+- `templates/all_games_calendar.html` - All games (calendar view)
 
 ### Adding Features
 
 Some ideas for enhancements:
-- **QR codes**: Generate QR code for each player's schedule URL
 - **iCal export**: Allow players to add games to their calendar
 - **Filtering**: Filter by game type, day, or time
 - **Notifications**: Email/SMS when games are added to schedule
 - **Game search**: Search for specific games by name
+- **Conflict detection**: Highlight overlapping game times
 
 ## Project Structure
 
 ```
 bottoscon/
-├── app.py                 # Flask application and logic
-├── requirements.txt       # Python dependencies
-├── Dockerfile            # Container configuration
-├── .dockerignore         # Files to exclude from container
-├── README.md             # This file
+├── app.py                      # Flask application and logic
+├── config.py                   # Convention dates and configuration
+├── requirements.txt            # Python dependencies
+├── Dockerfile                  # Container configuration
+├── .dockerignore               # Files to exclude from container
+├── README.md                   # This file
+├── SPECIFICATION.md            # Detailed technical specification
 └── templates/
-    ├── base.html         # Base template with common layout
-    ├── index.html        # Home page - player list
-    ├── schedule.html     # Individual player schedule
-    └── all_games.html    # All games view
+    ├── base.html               # Base template with common layout
+    ├── index.html              # Home page - player list
+    ├── schedule.html           # Individual player schedule (list view)
+    ├── calendar.html           # Individual player schedule (calendar view)
+    ├── all_games.html          # All games (list view)
+    └── all_games_calendar.html # All games (calendar view)
 ```
 
 ## Development Notes
@@ -214,9 +248,10 @@ bottoscon/
 1. App fetches CSV data from Google Sheets export URL
 2. Parses CSV to extract games and player signups (columns 23-31)
 3. Builds an index of which games each player is in
-4. Serves personalized views via Flask routes
-5. Caches data for 1 hour to avoid hitting Google too frequently
-6. Users can force refresh via "Update Schedule" button at any time
+4. Serves personalized views via Flask routes (both list and calendar formats)
+5. Calendar views use FullCalendar library with color-coded game status
+6. Caches data for 1 hour to avoid hitting Google too frequently
+7. Users can force refresh via "Update Schedule" button at any time
 
 ### Data Flow
 
