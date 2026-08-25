@@ -107,6 +107,11 @@
         border-radius: 15px;
         font-size: 0.85em;
     }
+    .player-tag.player-tag-waitlisted {
+        background: #fff3cd;
+        color: #856404;
+        font-weight: 600;
+    }
 </style>
 {% endblock %}
 
@@ -156,7 +161,7 @@
 
                 {% if game.status %}
                 <div class="detail-item">
-                    <span class="status-badge status-{{ game.status }}">{{ game.status }}</span>
+                    <span class="status-badge status-{{ game.status_class }}">{{ game.status }}</span>
                 </div>
                 {% endif %}
             </div>
@@ -166,7 +171,7 @@
                 <div class="players-label">👥 Players ({{ game.players|length }}):</div>
                 <div class="players-list">
                     {% for player in game.players %}
-                    <span class="player-tag">{{ player }}</span>
+                    <span class="player-tag {% if player in game.waitlisted_players %}player-tag-waitlisted{% endif %}">{{ player }}{% if player in game.waitlisted_players %} (Waitlist){% endif %}</span>
                     {% endfor %}
                 </div>
             </div>

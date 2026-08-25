@@ -17,6 +17,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import app
 from app import Flask
+from config import CONVENTION_DAYS
 
 # Configure logging
 logging.basicConfig(
@@ -122,7 +123,7 @@ def firefox_driver():
 @pytest.fixture
 def csv_file_path():
     """Return path to the local CSV file."""
-    return Path(__file__).parent.parent / "bottoscon2025.csv"
+    return Path(__file__).parent.parent / "bottoscon2026.csv"
 
 
 @pytest.fixture
@@ -133,22 +134,17 @@ def csv_games(csv_file_path):
         reader = csv.reader(f)
         rows = list(reader)
 
-        # Skip first 4 rows as headers (based on analysis)
-        # Rows 0-3 are headers, data starts at row 4
-        for i, row in enumerate(rows[4:], start=1):
-            if len(row) < 2:
-                continue
+        col_map = app.find_header_row(rows)
 
-            game_id = row[0].strip() if len(row) > 0 else ""
-            game_name = row[1].strip() if len(row) > 1 else ""
+        for i, row in enumerate(rows):
+            start_day = app.get_col(row, col_map, 'Start Day') if col_map else ''
+            game_name = app.get_col(row, col_map, 'Game Name') if col_map else ''
 
-            # Skip rows without game ID or name
-            if not game_id or not game_name:
+            if start_day not in set(CONVENTION_DAYS.keys()) or not game_name:
                 continue
 
             games.append({
-                'csv_line': i + 4,
-                'id': game_id,
+                'csv_line': i + 1,
                 'name': game_name,
                 'raw_row': row
             })
@@ -161,21 +157,3 @@ def parsed_games(client):
     """Get games parsed by the app's parse_games_and_players() function."""
     games, _ = app.parse_games_and_players()
     return games
-
-
-@pytest.fixture
-def game_167_from_csv(csv_games):
-    """Find and return game 167 from CSV."""
-    for game in csv_games:
-        if game['id'] == '167':
-            return game
-    return None
-
-
-@pytest.fixture
-def game_167_from_app(parsed_games):
-    """Find and return game 167 from parsed games."""
-    for game in parsed_games:
-        if str(game['id']) == '167':
-            return game
-    return None

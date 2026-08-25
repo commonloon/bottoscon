@@ -50,6 +50,13 @@
     .fc-event.status-FULL .fc-event-title {
         color: #721c24;
     }
+    .fc-event.status-WAITLISTED {
+        background-color: #fff3cd !important;
+        border-color: #ffc107 !important;
+    }
+    .fc-event.status-WAITLISTED .fc-event-title {
+        color: #856404;
+    }
     .legend {
         display: flex;
         gap: 20px;
@@ -215,6 +222,10 @@
         <div class="legend-color" style="background: #f8d7da;"></div>
         <span>Full (no space)</span>
     </div>
+    <div class="legend-item">
+        <div class="legend-color" style="background: #fff3cd;"></div>
+        <span>Waitlisted</span>
+    </div>
 </div>
 
 <div id='calendar'></div>
@@ -231,10 +242,9 @@
 
         // Date mapping (generated from server config)
         const dayMap = {
-            'Thursday': '{{ get_convention_date("Thursday") }}',
-            'Friday': '{{ get_convention_date("Friday") }}',
-            'Saturday': '{{ get_convention_date("Saturday") }}',
-            'Sunday': '{{ get_convention_date("Sunday") }}'
+            {% for day in convention_days %}'{{ day }}': '{{ get_convention_date(day) }}'{% if not loop.last %},{% endif %}
+
+            {% endfor %}
         };
 
         // Convert games to FullCalendar events
@@ -268,32 +278,32 @@
                 title: game.name,
                 start: `${startDate}T${startTimeStr}`,
                 end: `${endDate}T${endTimeStr}`,
-                classNames: [`status-${game.status || 'UNKNOWN'}`],
+                classNames: [game.viewer_waitlisted ? 'status-WAITLISTED' : `status-${game.status_class || 'UNKNOWN'}`],
                 extendedProps: {
                     table: game.table,
                     status: game.status,
                     playerCount: game.players.length,
-                    players: game.players
+                    players: game.players,
+                    viewerWaitlisted: game.viewer_waitlisted
                 }
             };
         });
 
         // Set initial date to the convention start date
-        const initialDate = dayMap['Thursday'];
+        const initialDate = dayMap['{{ convention_days[0] }}'];
 
         const calendar = new FullCalendar.Calendar(calendarEl, {
             initialDate: initialDate,
-            initialView: 'timeGridFourDay',
+            initialView: 'timeGridConvention',
             headerToolbar: {
                 left: 'title',
                 center: '',
                 right: ''
             },
             views: {
-                timeGridFourDay: {
+                timeGridConvention: {
                     type: 'timeGrid',
-                    duration: { days: 4 },
-                    buttonText: '4-Day View'
+                    duration: { days: {{ convention_days|length }} }
                 }
             },
             businessHours: {
@@ -321,6 +331,7 @@
                 if (props.table) tooltipText += `\nTable: ${props.table}`;
                 tooltipText += `\nStatus: ${props.status || 'Unknown'}`;
                 tooltipText += `\nPlayers: ${props.playerCount}`;
+                if (props.viewerWaitlisted) tooltipText += `\n⏳ You are on the waitlist`;
 
                 // Display: Game title (large), then times, then table ID
                 let html = `<div class="fc-event-main" title="${tooltipText}" style="color: black; font-weight: 600;">

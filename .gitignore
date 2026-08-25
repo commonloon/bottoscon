@@ -6,6 +6,7 @@ __pycache__/
 .Python
 env/
 venv/
+.venv/
 ENV/
 build/
 develop-eggs/
@@ -37,6 +38,9 @@ instance/
 # OS
 .DS_Store
 Thumbs.db
+
+# downloaded CSV files
+bottoscon20*.csv
 
 # Logs
 *.log

@@ -12,6 +12,8 @@ import pytest
 import json
 import re
 from bs4 import BeautifulSoup
+from config import CONVENTION_DAYS, CONVENTION_START_DATE
+from datetime import timedelta
 
 
 class TestCalendarTimeFormatting:
@@ -31,21 +33,6 @@ class TestCalendarTimeFormatting:
             assert re.match(time_pattern, end_time), (
                 f"Game {game['id']}: Invalid end_time format '{end_time}'"
             )
-
-    def test_game_167_time_format(self, game_167_from_app):
-        """TC: Game 167 has valid time format (may be HH:MM or HH:MM:SS)"""
-        if game_167_from_app is None:
-            pytest.skip("Game 167 not parsed")
-
-        game = game_167_from_app
-        time_pattern = r'^(\d{2}):(\d{2})(?::(\d{2}))?$'
-
-        assert re.match(time_pattern, game['start_time']), (
-            f"Game 167: Invalid start_time format '{game['start_time']}'"
-        )
-        assert re.match(time_pattern, game['end_time']), (
-            f"Game 167: Invalid end_time format '{game['end_time']}'"
-        )
 
     def test_games_with_mixed_time_formats(self, parsed_games):
         """Identify games with inconsistent time format (start has seconds but end doesn't)"""
@@ -107,10 +94,6 @@ class TestAllGamesCalendarView:
 
     def test_all_games_calendar_iso8601_timestamps(self, client, parsed_games):
         """TC: Verify calendar generates valid ISO 8601 timestamps"""
-        import app as app_module
-        from config import CONVENTION_DAYS, CONVENTION_START_DATE
-        from datetime import timedelta
-
         response = client.get('/calendar/all-games')
         html = response.data.decode()
 
@@ -128,12 +111,11 @@ class TestAllGamesCalendarView:
                 return f"{time_str}:00"
             return time_str
 
-        # Build date map (like in the JavaScript)
-        day_map = {}
-        for day in ['Thursday', 'Friday', 'Saturday', 'Sunday']:
-            offset = CONVENTION_DAYS.get(day, 0)
-            actual_date = CONVENTION_START_DATE + timedelta(days=offset)
-            day_map[day] = actual_date.strftime('%Y-%m-%d')
+        # Build date map from config (mirrors the Jinja template)
+        day_map = {
+            day: (CONVENTION_START_DATE + timedelta(days=offset)).strftime('%Y-%m-%d')
+            for day, offset in CONVENTION_DAYS.items()
+        }
 
         iso8601_pattern = r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$'
 
@@ -163,29 +145,66 @@ class TestAllGamesCalendarView:
                 f"(end_day={end_day}, end_time={end_time})"
             )
 
-    def test_game_167_in_all_games_calendar(self, client, game_167_from_app):
-        """TC-011: Game 167 appears in all-games calendar view"""
-        if game_167_from_app is None:
-            pytest.skip("Game 167 not parsed")
+class TestLandingPageNav:
+    """Test that the landing page links to the all-games calendar."""
 
+    def test_index_has_calendar_link(self, client):
+        response = client.get('/')
+        assert response.status_code == 200
+        html = response.data.decode()
+        assert '/calendar/all-games' in html
+
+
+class TestGameDetailPanel:
+    """Test that the all-games calendar's click-to-open detail panel is wired up."""
+
+    def test_detail_panel_markup_and_handlers_present(self, client):
+        response = client.get('/calendar/all-games')
+        assert response.status_code == 200
+        html = response.data.decode()
+
+        assert 'id="gameDetailOverlay"' in html
+        assert 'eventClick' in html
+        assert 'showGameDetailPanel' in html
+
+    def test_event_props_include_organizer_and_waitlist(self, client, parsed_games):
+        """The per-event extendedProps built client-side must be able to derive
+        organizer/waitlist info from data actually present in the embedded games JSON."""
         response = client.get('/calendar/all-games')
         html = response.data.decode()
 
-        # Find the games JSON
+        assert 'organizer:' in html
+        assert 'waitlistedPlayers:' in html
+
         match = re.search(r'const games = (\[.*?\]);', html, re.DOTALL)
         assert match, "No games data found in calendar page"
+        frontend_games = json.loads(match.group(1))
 
-        games_json = match.group(1)
-        frontend_games = json.loads(games_json)
+        games_with_players = [g for g in frontend_games if g['players']]
+        assert games_with_players, "Expected at least one game with players"
+        assert 'waitlisted_players' in games_with_players[0]
 
-        game_167_found = any(
-            g.get('title') == 'New Cold War' or '167' in str(g)
-            for g in frontend_games
-        )
+    def test_description_wired_up_with_linkify(self, client, parsed_games):
+        """The detail panel must include the description field and turn URLs
+        within it (e.g. BGG links) into real clickable links, not plain text."""
+        response = client.get('/calendar/all-games')
+        html = response.data.decode()
 
-        assert game_167_found, (
-            "Game 167 'New Cold War' not found in all-games calendar data"
-        )
+        assert 'description:' in html
+        assert 'function linkifyText' in html
+        assert 'target="_blank"' in html
+
+        games_with_links = [
+            g for g in parsed_games
+            if g.get('description') and 'http' in g['description']
+        ]
+        assert games_with_links, "Expected at least one game with a URL in its description"
+
+        match = re.search(r'const games = (\[.*?\]);', html, re.DOTALL)
+        assert match, "No games data found in calendar page"
+        frontend_games = json.loads(match.group(1))
+        frontend_game = next(g for g in frontend_games if g['name'] == games_with_links[0]['name'])
+        assert 'http' in frontend_game['description']
 
 
 class TestPlayerCalendarView:
@@ -219,8 +238,6 @@ class TestPlayerCalendarView:
     def test_player_calendar_iso8601_timestamps(self, client):
         """Verify player calendar generates valid ISO 8601 timestamps"""
         import app as app_module
-        from config import CONVENTION_DAYS, CONVENTION_START_DATE
-        from datetime import timedelta
 
         _, player_games = app_module.parse_games_and_players()
 
@@ -247,12 +264,11 @@ class TestPlayerCalendarView:
                 return f"{time_str}:00"
             return time_str
 
-        # Build date map (like in the JavaScript)
-        day_map = {}
-        for day in ['Thursday', 'Friday', 'Saturday', 'Sunday']:
-            offset = CONVENTION_DAYS.get(day, 0)
-            actual_date = CONVENTION_START_DATE + timedelta(days=offset)
-            day_map[day] = actual_date.strftime('%Y-%m-%d')
+        # Build date map from config (mirrors the Jinja template)
+        day_map = {
+            day: (CONVENTION_START_DATE + timedelta(days=offset)).strftime('%Y-%m-%d')
+            for day, offset in CONVENTION_DAYS.items()
+        }
 
         iso8601_pattern = r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$'
 
@@ -278,28 +294,6 @@ class TestPlayerCalendarView:
             assert re.match(iso8601_pattern, end_iso), (
                 f"Invalid end timestamp for game {frontend_game.get('name')}: {end_iso}"
             )
-
-    def test_game_167_player_calendar(self, client, game_167_from_app):
-        """Verify game 167 appears in player calendar if they're in the game"""
-        if game_167_from_app is None:
-            pytest.skip("Game 167 not parsed")
-
-        # Get a player from game 167
-        players = game_167_from_app.get('players', [])
-        if not players:
-            pytest.skip("Game 167 has no players")
-
-        player_name = players[0]
-        response = client.get(f'/calendar/{player_name}')
-        assert response.status_code == 200
-
-        html = response.data.decode()
-
-        # Check if game 167 is in the calendar data
-        assert 'New Cold War' in html or '167' in html or game_167_from_app['name'] in html, (
-            f"Game 167 'New Cold War' not found in calendar for {player_name}"
-        )
-
 
 class TestCalendarDataIntegrity:
     """Test that calendar data matches backend parsed data."""
@@ -328,6 +322,153 @@ class TestCalendarDataIntegrity:
         assert 'games total' in html or 'game' in html.lower(), (
             "Calendar should display game count"
         )
+
+
+class TestPlayerWaitlistView:
+    """Test that a player's own views clearly mark games they're waitlisted for."""
+
+    def _find_waitlisted_player(self):
+        import app as app_module
+        _, player_games = app_module.parse_games_and_players()
+        for player_name, games in player_games.items():
+            for game in games:
+                if player_name in game.get('waitlisted_players', []):
+                    confirmed = [g for g in games if player_name not in g.get('waitlisted_players', [])]
+                    return player_name, game, confirmed
+        return None, None, None
+
+    def _find_confirmed_player_with_waitlisted_gamemate(self):
+        import app as app_module
+        games, _ = app_module.parse_games_and_players()
+        for game in games:
+            if not game['waitlisted_players']:
+                continue
+            confirmed = [p for p in game['players'] if p not in game['waitlisted_players']]
+            if confirmed:
+                return confirmed[0], game['waitlisted_players'][0], game
+        return None, None, None
+
+    def test_schedule_marks_waitlisted_game(self, client):
+        """Waitlisted game's card is flagged; a confirmed game's card is not."""
+        player_name, waitlisted_game, confirmed_games = self._find_waitlisted_player()
+        if player_name is None:
+            pytest.skip("No waitlisted player found in the live sheet")
+
+        response = client.get(f'/schedule/{player_name}')
+        assert response.status_code == 200
+        soup = BeautifulSoup(response.data.decode(), 'html.parser')
+
+        cards = soup.select('.game-card')
+        waitlisted_card = next((c for c in cards if waitlisted_game['name'] in c.get_text()), None)
+        assert waitlisted_card is not None, f"Could not find a game card for {waitlisted_game['name']}"
+        assert 'game-card-waitlisted' in waitlisted_card.get('class', []), (
+            "Waitlisted game's card should carry the game-card-waitlisted class"
+        )
+        assert "You're Waitlisted" in waitlisted_card.get_text(), (
+            "Waitlisted game's card should show a waitlisted badge"
+        )
+
+        if confirmed_games:
+            confirmed_card = next(
+                (c for c in cards if confirmed_games[0]['name'] in c.get_text()), None
+            )
+            if confirmed_card is not None:
+                assert 'game-card-waitlisted' not in confirmed_card.get('class', []), (
+                    f"Confirmed game '{confirmed_games[0]['name']}' should not be marked as waitlisted"
+                )
+
+    def test_schedule_marks_other_waitlisted_player_in_roster(self, client):
+        """A confirmed player's own schedule still tags OTHER waitlisted
+        players within a shared game's roster (regression: this was
+        previously only fixed on /all-games, not on the personal schedule)."""
+        viewer_name, waitlisted_name, game = self._find_confirmed_player_with_waitlisted_gamemate()
+        if viewer_name is None:
+            pytest.skip("No game with both a confirmed and a waitlisted player found")
+
+        response = client.get(f'/schedule/{viewer_name}')
+        assert response.status_code == 200
+        soup = BeautifulSoup(response.data.decode(), 'html.parser')
+
+        cards = soup.select('.game-card')
+        game_card = next((c for c in cards if game['name'] in c.get_text()), None)
+        assert game_card is not None, f"Could not find a game card for {game['name']}"
+
+        waitlisted_tag = next(
+            (tag for tag in game_card.select('.player-tag') if waitlisted_name in tag.get_text()), None
+        )
+        assert waitlisted_tag is not None, f"Could not find player tag for {waitlisted_name}"
+        assert 'player-tag-waitlisted' in waitlisted_tag.get('class', []), (
+            f"{waitlisted_name}'s tag should carry player-tag-waitlisted even on {viewer_name}'s own schedule"
+        )
+
+        viewer_tag = next(
+            (tag for tag in game_card.select('.player-tag') if 'current-player' in tag.get('class', [])), None
+        )
+        if viewer_tag is not None:
+            assert 'player-tag-waitlisted' not in viewer_tag.get('class', []), (
+                f"Confirmed viewer {viewer_name} should not be marked as waitlisted"
+            )
+
+    def test_calendar_json_flags_waitlisted_game(self, client):
+        """Player calendar's embedded games JSON flags viewer_waitlisted correctly."""
+        player_name, waitlisted_game, confirmed_games = self._find_waitlisted_player()
+        if player_name is None:
+            pytest.skip("No waitlisted player found in the live sheet")
+
+        response = client.get(f'/calendar/{player_name}')
+        assert response.status_code == 200
+        html = response.data.decode()
+        assert 'status-WAITLISTED' in html, "Calendar page should include the status-WAITLISTED class"
+
+        match = re.search(r'const games = (\[.*?\]);', html, re.DOTALL)
+        assert match, "No games data found in player calendar page"
+        frontend_games = json.loads(match.group(1))
+
+        frontend_waitlisted = next(
+            (g for g in frontend_games if g['name'] == waitlisted_game['name']), None
+        )
+        assert frontend_waitlisted is not None
+        assert frontend_waitlisted['viewer_waitlisted'] is True
+
+        if confirmed_games:
+            frontend_confirmed = next(
+                (g for g in frontend_games if g['name'] == confirmed_games[0]['name']), None
+            )
+            if frontend_confirmed is not None:
+                assert frontend_confirmed['viewer_waitlisted'] is False
+
+    def test_all_games_marks_specific_waitlisted_player(self, client):
+        """/all-games tags only the specific waitlisted player, not their game-mates."""
+        player_name, waitlisted_game, _ = self._find_waitlisted_player()
+        if player_name is None:
+            pytest.skip("No waitlisted player found in the live sheet")
+
+        response = client.get('/all-games')
+        assert response.status_code == 200
+        soup = BeautifulSoup(response.data.decode(), 'html.parser')
+
+        cards = soup.select('.game-card')
+        game_card = next((c for c in cards if waitlisted_game['name'] in c.get_text()), None)
+        assert game_card is not None, f"Could not find a game card for {waitlisted_game['name']}"
+
+        waitlisted_tag = next(
+            (tag for tag in game_card.select('.player-tag') if player_name in tag.get_text()), None
+        )
+        assert waitlisted_tag is not None, f"Could not find player tag for {player_name}"
+        assert 'player-tag-waitlisted' in waitlisted_tag.get('class', []), (
+            f"{player_name}'s tag in '{waitlisted_game['name']}' should carry player-tag-waitlisted"
+        )
+
+        confirmed_players = [p for p in waitlisted_game['players'] if p != player_name]
+        if confirmed_players:
+            other_tag = next(
+                (tag for tag in game_card.select('.player-tag') if confirmed_players[0] in tag.get_text()),
+                None
+            )
+            if other_tag is not None:
+                assert 'player-tag-waitlisted' not in other_tag.get('class', []), (
+                    f"Confirmed player '{confirmed_players[0]}' should not be marked as waitlisted"
+                )
 
 
 if __name__ == '__main__':

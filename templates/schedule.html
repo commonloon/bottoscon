@@ -27,6 +27,26 @@
         display: inline-block;
         font-size: 0.9em;
     }
+    .header-actions {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px;
+        margin-top: 10px;
+    }
+    .favourite-toggle-btn {
+        background: #ffc107;
+        color: #856404;
+        border: none;
+        padding: 8px 15px;
+        border-radius: 20px;
+        font-size: 0.9em;
+        font-weight: 600;
+        cursor: pointer;
+    }
+    .favourite-toggle-btn:hover {
+        background: #e0a800;
+    }
     .day-section {
         margin-bottom: 30px;
     }
@@ -110,6 +130,15 @@
         background: #efe;
         color: #3c3;
     }
+    .status-badge.viewer-waitlisted {
+        background: #fff3cd;
+        color: #856404;
+        margin-left: 8px;
+    }
+    .game-card.game-card-waitlisted {
+        border-color: #ffc107;
+        background: #fffdf5;
+    }
     .players-section {
         margin-top: 15px;
         padding-top: 15px;
@@ -136,6 +165,15 @@
         background: #667eea;
         color: white;
         font-weight: 600;
+    }
+    .player-tag.player-tag-waitlisted {
+        background: #fff3cd;
+        color: #856404;
+        font-weight: 600;
+    }
+    .player-tag.player-tag-waitlisted.current-player {
+        background: #856404;
+        color: #fff3cd;
     }
     .no-games {
         text-align: center;
@@ -176,7 +214,7 @@
             padding: 8px;
             box-shadow: none;
         }
-        header, nav, .actions, footer, .game-count-badge {
+        header, nav, .actions, footer, .game-count-badge, .favourite-toggle-btn {
             display: none;
         }
         .player-header {
@@ -319,7 +357,14 @@
 {% block content %}
 <div class="player-header">
     <h2>{{ player_name }}'s Schedule</h2>
-    <div class="game-count-badge">🎮 {{ games|length }} game{{ 's' if games|length != 1 else '' }} scheduled</div>
+    <div class="header-actions">
+        <div class="game-count-badge">🎮 {{ games|length }} game{{ 's' if games|length != 1 else '' }} scheduled</div>
+        {% if player_name in favourites %}
+        <button class="favourite-toggle-btn" data-player-name="{{ player_name }}">★ Remove from Favourites</button>
+        {% else %}
+        <button class="favourite-toggle-btn" data-player-name="{{ player_name }}">☆ Add to Favourites</button>
+        {% endif %}
+    </div>
 </div>
 
 {% if games %}
@@ -334,7 +379,7 @@
                 <div class="day-header">📅 {{ game.start_day }}</div>
         {% endif %}
 
-        <div class="game-card">
+        <div class="game-card {% if game.viewer_waitlisted %}game-card-waitlisted{% endif %}">
             <div class="game-header">
                 <div class="game-title">{{ game.name }}</div>
                 <div class="game-id">Game #{{ game.id }}</div>
@@ -365,7 +410,10 @@
 
                 {% if game.status %}
                 <div class="detail-item">
-                    <span class="status-badge status-{{ game.status }}">{{ game.status }}</span>
+                    <span class="status-badge status-{{ game.status_class }}">{{ game.status }}</span>
+                    {% if game.viewer_waitlisted %}
+                    <span class="status-badge viewer-waitlisted">⏳ You're Waitlisted</span>
+                    {% endif %}
                 </div>
                 {% endif %}
             </div>
@@ -375,8 +423,8 @@
                 <div class="players-label">👥 Players ({{ game.players|length }}):</div>
                 <div class="players-list">
                     {% for player in game.players %}
-                    <span class="player-tag {% if player == player_name %}current-player{% endif %}">
-                        {{ player }}
+                    <span class="player-tag {% if player == player_name %}current-player{% endif %} {% if player in game.waitlisted_players %}player-tag-waitlisted{% endif %}">
+                        {{ player }}{% if player in game.waitlisted_players %} (Waitlist){% endif %}
                     </span>
                     {% endfor %}
                 </div>

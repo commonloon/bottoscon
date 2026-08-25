@@ -57,6 +57,35 @@
         nav a:hover {
             text-decoration: underline;
         }
+        .favourites-bar {
+            margin-top: 12px;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px;
+        }
+        .favourites-label {
+            color: #666;
+            font-size: 0.9em;
+            font-weight: 600;
+        }
+        .favourite-chip {
+            display: inline-flex;
+            align-items: center;
+            background: #f0f4ff;
+            border-radius: 15px;
+            padding: 4px 12px;
+            font-size: 0.85em;
+        }
+        .favourite-chip a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+            margin: 0;
+        }
+        .favourite-chip a:hover {
+            text-decoration: underline;
+        }
         .refresh-section {
             display: inline-flex;
             align-items: center;
@@ -207,6 +236,16 @@
                     <span id="refreshMessage" class="refresh-message" style="display: none;"></span>
                 </div>
             </nav>
+            {% if favourites %}
+            <div class="favourites-bar">
+                <span class="favourites-label">⭐ Favourites:</span>
+                {% for name in favourites %}
+                <span class="favourite-chip">
+                    <a href="{{ url_for('player_schedule', player_name=name) }}">{{ name }}</a>
+                </span>
+                {% endfor %}
+            </div>
+            {% endif %}
         </header>
 
         <div class="content">
@@ -220,6 +259,22 @@
     </div>
 
     <script>
+        function toggleFavourite(name) {
+            fetch(`/api/favourites/toggle/${encodeURIComponent(name)}`, { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        window.location.reload();
+                    }
+                });
+        }
+
+        document.querySelectorAll('.favourite-toggle-btn').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                toggleFavourite(this.dataset.playerName);
+            });
+        });
+
         document.getElementById('refreshBtn').addEventListener('click', function() {
             const btn = this;
             const message = document.getElementById('refreshMessage');

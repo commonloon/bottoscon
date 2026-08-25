@@ -91,6 +91,93 @@
         border: 1px solid #333;
         border-radius: 2px;
     }
+    .modal-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.5);
+        z-index: 2000;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+    }
+    .modal-overlay.open {
+        display: flex;
+    }
+    .modal-panel {
+        background: white;
+        border-radius: 8px;
+        padding: 25px;
+        max-width: 500px;
+        width: 100%;
+        max-height: 85vh;
+        overflow-y: auto;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+        position: relative;
+    }
+    .modal-close {
+        position: absolute;
+        top: 15px;
+        right: 15px;
+        background: none;
+        border: none;
+        font-size: 1.5em;
+        line-height: 1;
+        cursor: pointer;
+        color: #999;
+    }
+    .modal-close:hover {
+        color: #333;
+    }
+    .modal-panel h3 {
+        color: #667eea;
+        margin: 0 20px 15px 0;
+    }
+    .detail-row {
+        margin-bottom: 10px;
+        color: #333;
+    }
+    .detail-description {
+        margin-top: 15px;
+        padding-top: 15px;
+        border-top: 1px solid #e0e0e0;
+        line-height: 1.5;
+    }
+    .detail-description a {
+        color: #667eea;
+    }
+    .status-badge {
+        display: inline-block;
+        padding: 5px 12px;
+        border-radius: 15px;
+        font-size: 0.85em;
+        font-weight: 600;
+    }
+    .status-FULL {
+        background: #fee;
+        color: #c33;
+    }
+    .status-OPEN {
+        background: #efe;
+        color: #3c3;
+    }
+    .players-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 8px;
+    }
+    .player-tag {
+        background: #f5f5f5;
+        padding: 5px 12px;
+        border-radius: 15px;
+        font-size: 0.85em;
+    }
+    .player-tag.player-tag-waitlisted {
+        background: #fff3cd;
+        color: #856404;
+        font-weight: 600;
+    }
     .actions {
         margin-top: 30px;
         padding-top: 20px;
@@ -138,6 +225,9 @@
         }
         .actions {
             display: none;
+        }
+        .modal-overlay {
+            display: none !important;
         }
         .page-header {
             background: none;
@@ -229,18 +319,11 @@
 </div>
 
 <div class="day-tabs">
-    <button class="day-tab active" data-day="Thursday" onclick="switchDay(event, 'Thursday')">
-        Thursday
+    {% for day in convention_days %}
+    <button class="day-tab {% if loop.first %}active{% endif %}" data-day="{{ day }}" onclick="switchDay(event, '{{ day }}')">
+        {{ day }}
     </button>
-    <button class="day-tab" data-day="Friday" onclick="switchDay(event, 'Friday')">
-        Friday
-    </button>
-    <button class="day-tab" data-day="Saturday" onclick="switchDay(event, 'Saturday')">
-        Saturday
-    </button>
-    <button class="day-tab" data-day="Sunday" onclick="switchDay(event, 'Sunday')">
-        Sunday
-    </button>
+    {% endfor %}
 </div>
 
 <div class="legend">
@@ -260,17 +343,24 @@
     <a href="{{ url_for('all_games') }}" class="btn">📋 List View</a>
 </div>
 
+<div class="modal-overlay" id="gameDetailOverlay" onclick="if (event.target === this) closeGameDetailPanel()">
+    <div class="modal-panel">
+        <button class="modal-close" onclick="closeGameDetailPanel()" title="Close">×</button>
+        <h3 id="gameDetailTitle"></h3>
+        <div id="gameDetailBody"></div>
+    </div>
+</div>
+
 <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js'></script>
 <script>
     let calendar;
-    let currentDay = 'Thursday';
+    let currentDay = '{{ convention_days[0] }}';
 
     // Date mapping (generated from server config)
     const dayMap = {
-        'Thursday': '{{ get_convention_date("Thursday") }}',
-        'Friday': '{{ get_convention_date("Friday") }}',
-        'Saturday': '{{ get_convention_date("Saturday") }}',
-        'Sunday': '{{ get_convention_date("Sunday") }}'
+        {% for day in convention_days %}'{{ day }}': '{{ get_convention_date(day) }}'{% if not loop.last %},{% endif %}
+
+        {% endfor %}
     };
 
     const games = {{ games|tojson }};
@@ -305,13 +395,19 @@
             title: game.name,
             start: `${startDate}T${startTimeStr}`,
             end: `${endDate}T${endTimeStr}`,
-            classNames: [`status-${game.status || 'UNKNOWN'}`],
+            classNames: [`status-${game.status_class || 'UNKNOWN'}`],
             extendedProps: {
                 table: game.table,
                 status: game.status,
+                statusClass: game.status_class || 'UNKNOWN',
+                duration: game.duration,
                 playerCount: game.players.length,
                 players: game.players,
-                dayName: dayStr
+                waitlistedPlayers: game.waitlisted_players || [],
+                organizer: game.players.length > 0 ? game.players[0] : null,
+                description: game.description,
+                dayName: dayStr,
+                waitlistedCount: (game.waitlisted_players || []).length
             }
         };
     });
@@ -358,6 +454,9 @@
             slotMinTime: '09:00',
             slotMaxTime: '24:00',
             events: dayEvents,
+            eventClick: function(info) {
+                showGameDetailPanel(info.event);
+            },
             eventContent: function(arg) {
                 const props = arg.event.extendedProps;
                 const startTime = arg.event.start.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
@@ -368,6 +467,7 @@
                 if (props.table) tooltipText += `\nTable: ${props.table}`;
                 tooltipText += `\nStatus: ${props.status || 'Unknown'}`;
                 tooltipText += `\nPlayers: ${props.playerCount}`;
+                if (props.waitlistedCount) tooltipText += `\n⏳ ${props.waitlistedCount} on waitlist`;
 
                 // Display: Game title (large), then times, then table ID
                 let html = `<div class="fc-event-main" title="${tooltipText}" style="color: black; font-weight: 600;">
@@ -385,9 +485,64 @@
         calendar.render();
     }
 
-    // Initialize with Thursday
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text == null ? '' : text;
+        return div.innerHTML;
+    }
+
+    // Escapes text for safe HTML embedding while turning any URLs within it
+    // into clickable links (organizer notes often include BGG/review links).
+    function linkifyText(text) {
+        if (!text) return '';
+        const urlPattern = /https?:\/\/[^\s<>"]+/g;
+        let html = '';
+        let lastIndex = 0;
+        let match;
+        while ((match = urlPattern.exec(text)) !== null) {
+            html += escapeHtml(text.slice(lastIndex, match.index));
+            const url = match[0].replace(/[.,;:)\]]+$/, '');
+            const trailing = match[0].slice(url.length);
+            html += `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(url)}</a>${escapeHtml(trailing)}`;
+            lastIndex = match.index + match[0].length;
+        }
+        html += escapeHtml(text.slice(lastIndex));
+        return html.replace(/\n/g, '<br>');
+    }
+
+    function showGameDetailPanel(event) {
+        const props = event.extendedProps;
+        const startTime = event.start.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+        const endTime = event.end.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+
+        const playersHtml = props.players.map(name => {
+            const waitlisted = props.waitlistedPlayers.includes(name);
+            return `<span class="player-tag${waitlisted ? ' player-tag-waitlisted' : ''}">${escapeHtml(name)}${waitlisted ? ' (Waitlist)' : ''}</span>`;
+        }).join('');
+
+        document.getElementById('gameDetailTitle').textContent = event.title;
+        document.getElementById('gameDetailBody').innerHTML = `
+            <div class="detail-row"><strong>When:</strong> ${startTime} - ${endTime}${props.duration ? ' (' + escapeHtml(props.duration) + ')' : ''}</div>
+            ${props.table ? `<div class="detail-row"><strong>Table:</strong> ${escapeHtml(props.table)}</div>` : ''}
+            <div class="detail-row"><strong>Status:</strong> <span class="status-badge status-${escapeHtml(props.statusClass)}">${escapeHtml(props.status || 'Unknown')}</span></div>
+            ${props.organizer ? `<div class="detail-row"><strong>Organizer:</strong> ${escapeHtml(props.organizer)}</div>` : ''}
+            <div class="detail-row"><strong>Players (${props.players.length}):</strong></div>
+            <div class="players-list">${playersHtml || '<em>No players yet</em>'}</div>
+            ${props.description ? `<div class="detail-row detail-description"><strong>Description / Notes:</strong><br>${linkifyText(props.description)}</div>` : ''}
+        `;
+        document.getElementById('gameDetailOverlay').classList.add('open');
+    }
+
+    function closeGameDetailPanel() {
+        document.getElementById('gameDetailOverlay').classList.remove('open');
+    }
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') closeGameDetailPanel();
+    });
+
     document.addEventListener('DOMContentLoaded', function() {
-        updateCalendarForDay('Thursday');
+        updateCalendarForDay('{{ convention_days[0] }}');
     });
 </script>
 {% endblock %}

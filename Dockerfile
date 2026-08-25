@@ -7,7 +7,9 @@ WORKDIR /app
 # Copy requirements first for better caching
 COPY requirements.txt .
 
-# Install dependencies
+# Install dependencies (root/no-venv is expected in a container build; quiet the advisory noise)
+ENV PIP_ROOT_USER_ACTION=ignore
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code

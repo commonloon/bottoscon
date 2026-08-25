@@ -1,15 +1,14 @@
 """
 BottosCon Configuration
-Updated by Claude AI at 2025-11-04 14:30:00
 
 Modify these settings for each convention year.
 """
 
 from datetime import datetime
 
-# Convention dates and times for 2025
-# Start date should be a Thursday
-CONVENTION_START_DATE = datetime(2025, 11, 6)  # Thursday, November 6, 2025
+# Convention dates and times for 2026
+# Start date is a Thursday
+CONVENTION_START_DATE = datetime(2026, 11, 5)  # Thursday, November 5, 2026
 
 # Convention days in order (day name -> date offset from start)
 CONVENTION_DAYS = {
@@ -21,7 +20,7 @@ CONVENTION_DAYS = {
 
 # Convention schedule
 CONVENTION_START_HOUR = 9  # 9am
-CONVENTION_END_HOUR = 24  # Midnight (11pm + 1 hour)
+CONVENTION_END_HOUR = 24  # Midnight
 
-# Special case: Sunday ends at 4pm instead of midnight
-SUNDAY_END_HOUR = 16  # 4pm
+# Special case: Sunday ends at 6pm instead of midnight
+SUNDAY_END_HOUR = 18  # 6pm
