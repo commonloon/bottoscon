@@ -54,7 +54,7 @@ pip install -r requirements-tools.txt
 python tools/make_qr.py --base-url https://your-app-url
 ```
 
-This writes a `table_qr_codes/` folder containing one single-page PDF per table (named after the table, e.g. `NE02.pdf`) plus `00_ALL_TABLES.pdf` with every table, one per page. Each QR code opens `<base-url>/table/<table id>`. Keep the base URL stable once codes are printed. The table list is read from the Table Usage sheet (so the two sheet env vars must be set); use `--tables NW01,NW02` to name tables yourself instead.
+This writes a `table_qr_codes/` folder containing one single-page PDF per table (named after the table, e.g. `NE02.pdf`) plus `00_ALL_TABLES.pdf` with every table, one per page. Each QR code opens `<base-url>/table/<table id>` and has the BottosCon logo (`tools/BottosCon-logo.png`) in the middle; use `--logo PATH` for a different image or `--no-logo` to omit it. Keep the base URL stable once codes are printed. The table list is read from the Table Usage sheet (so the two sheet env vars must be set); use `--tables NW01,NW02` to name tables yourself instead.
 
 ## Architecture
 

@@ -9,8 +9,9 @@ writes a folder (default: table_qr_codes/) containing
     <TABLE>.pdf      one single-page PDF per table, named after the table
     00_ALL_TABLES.pdf   every table, one table per page
 
-Each code links to <base-url>/table/<table id>. Keep the base URL stable once
-codes are printed. To skip the sheets and name the tables yourself:
+Each code links to <base-url>/table/<table id> and carries the BottosCon logo
+in the middle (tools/BottosCon-logo.png; use --logo PATH for another image or
+--no-logo to omit it). Keep the base URL stable once codes are printed. To skip the sheets and name the tables yourself:
 
     python tools/make_qr.py --base-url https://... --tables NW01,NW02,SE09
 """
@@ -23,6 +24,7 @@ from urllib.parse import quote
 import segno
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.units import inch
+from reportlab.lib.utils import ImageReader
 from reportlab.pdfbase.pdfmetrics import stringWidth
 from reportlab.pdfgen import canvas
 
@@ -31,6 +33,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 ALL_FILENAME = '00_ALL_TABLES.pdf'
 QR_SIZE = 5.5 * inch          # includes the 4-module quiet zone
 QUIET_MODULES = 4
+DEFAULT_LOGO = Path(__file__).resolve().parent / 'BottosCon-logo.png'
+LOGO_FRACTION = 0.22          # logo width as a fraction of the QR's data area. Error level H
+                              # tolerates ~30% damage; this covers ~5% of the area.
 
 
 def load_tables(names):
@@ -45,9 +50,13 @@ def safe_filename(table_id):
     return re.sub(r'[^A-Za-z0-9._-]', '_', table_id) + '.pdf'
 
 
-def draw_qr(c, url, center_x, top_y, size):
-    """Draw `url` as a vector QR code (one filled path, so no hairline seams)."""
-    matrix = segno.make(url, error='m', boost_error=False).matrix
+def draw_qr(c, url, center_x, top_y, size, logo=None):
+    """
+    Draw `url` as a vector QR code (one filled path, so no hairline seams),
+    with `logo` (an ImageReader) centred on a white backing if given. A logo
+    hides modules, so the code uses error-correction level H instead of M.
+    """
+    matrix = segno.make(url, error='h' if logo else 'm', boost_error=False).matrix
     modules = len(matrix)
     module = size / (modules + 2 * QUIET_MODULES)
     left = center_x - size / 2 + QUIET_MODULES * module
@@ -60,8 +69,19 @@ def draw_qr(c, url, center_x, top_y, size):
     c.setFillColorRGB(0, 0, 0)
     c.drawPath(path, stroke=0, fill=1)
 
+    if logo:
+        img_w, img_h = logo.getSize()
+        logo_w = modules * module * LOGO_FRACTION
+        logo_h = logo_w * img_h / img_w
+        center_y = top_y - size / 2
+        pad = module  # white margin so the logo doesn't touch neighbouring modules
+        c.setFillColorRGB(1, 1, 1)
+        c.rect(center_x - logo_w / 2 - pad, center_y - logo_h / 2 - pad,
+               logo_w + 2 * pad, logo_h + 2 * pad, stroke=0, fill=1)
+        c.drawImage(logo, center_x - logo_w / 2, center_y - logo_h / 2, logo_w, logo_h, mask='auto')
 
-def draw_page(c, table_id, table_type, url):
+
+def draw_page(c, table_id, table_type, url, logo=None):
     """One table per page (letter, portrait)."""
     width, height = letter
     cx = width / 2
@@ -78,7 +98,7 @@ def draw_page(c, table_id, table_type, url):
         c.drawCentredString(cx, height - 2.5 * inch, table_type)
 
     qr_top = height - 2.8 * inch
-    draw_qr(c, url, cx, qr_top, QR_SIZE)
+    draw_qr(c, url, cx, qr_top, QR_SIZE, logo)
 
     c.setFillColorRGB(0, 0, 0)
     c.setFont('Helvetica-Bold', 24)
@@ -96,6 +116,8 @@ def main():
     ap.add_argument('--base-url', required=True, help='public URL of the app')
     ap.add_argument('--tables', help='comma-separated table ids (default: read the Table Usage sheet)')
     ap.add_argument('--out-dir', default='table_qr_codes')
+    ap.add_argument('--logo', default=str(DEFAULT_LOGO), help='logo image for the centre of each code')
+    ap.add_argument('--no-logo', action='store_true', help='plain QR codes without a logo')
     args = ap.parse_args()
 
     base = args.base_url.rstrip('/')
@@ -104,6 +126,12 @@ def main():
     tables = load_tables(args.tables)
     if not tables:
         sys.exit('No tables found')
+
+    logo = None
+    if not args.no_logo:
+        if not Path(args.logo).is_file():
+            sys.exit(f'Logo not found: {args.logo} (use --no-logo to omit it)')
+        logo = ImageReader(args.logo)
 
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -114,9 +142,9 @@ def main():
         url = f'{base}/table/{quote(table_id)}'
         single = canvas.Canvas(str(out_dir / safe_filename(table_id)), pagesize=letter)
         single.setTitle(f'Table {table_id}')
-        draw_page(single, table_id, table_type, url)
+        draw_page(single, table_id, table_type, url, logo)
         single.save()
-        draw_page(all_canvas, table_id, table_type, url)
+        draw_page(all_canvas, table_id, table_type, url, logo)
     all_canvas.save()
     print(f'Wrote {len(tables)} table PDFs plus {ALL_FILENAME} to {out_dir}/')
 
