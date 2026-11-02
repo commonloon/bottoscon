@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block title %}Table {{ table.id }} - BottosCon{% endblock %}
+
+{% block extra_css %}
+<style>
+    .table-title { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+    .table-type { color: #666; font-size: 1.1em; font-weight: 600; }
+    .status-banner { padding: 14px 18px; border-radius: 8px; font-size: 1.15em; font-weight: 600; margin: 15px 0; }
+    .status-banner.free { background: #d4edda; color: #155724; }
+    .status-banner.busy { background: #f8d7da; color: #721c24; }
+    .status-banner.closed { background: #eee; color: #555; }
+    .day-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 15px 0; }
+    .day-tabs a { padding: 8px 16px; border-radius: 5px; background: #f0f4ff; color: #667eea;
+                  text-decoration: none; font-weight: 600; }
+    .day-tabs a.active { background: #667eea; color: white; }
+    .strip { display: flex; height: 28px; border-radius: 5px; overflow: hidden; border: 1px solid #ccc; margin: 10px 0 4px; }
+    .strip .seg { min-width: 2px; }
+    .strip .seg.free { background: #7bd48a; }
+    .strip .seg.busy { background: #e57373; border-left: 1px solid white; }
+    .strip-ends { display: flex; justify-content: space-between; color: #666; font-size: 0.85em; margin-bottom: 15px; }
+    .slot { display: flex; gap: 15px; padding: 12px 14px; margin-bottom: 8px; border-radius: 6px; border-left: 6px solid; }
+    .slot.free { background: #f1faf3; border-color: #4caf50; }
+    .slot.busy { background: #fdf2f2; border-color: #e57373; }
+    .slot-time { min-width: 130px; font-weight: 600; font-variant-numeric: tabular-nums; }
+    .slot-detail small { color: #666; display: block; }
+    .reserve-hint { margin-top: 20px; padding: 12px 16px; background: #f5f5f5; border-radius: 8px; color: #555; }
+</style>
+{% endblock %}
+
+{% block nav_items %}
+<a href="{{ url_for('open_tables', day=day) }}">🔎 Find an open table</a>
+{% endblock %}
+
+{% block content %}
+<h2 class="table-title">Table {{ table.id }} {% if table.type %}<span class="table-type">{{ table.type }}</span>{% endif %}</h2>
+
+{% if day == today %}
+    {% if status == 'free' %}
+    <div class="status-banner free">Free now, until {{ detail.strftime('%H:%M') if detail.hour or detail.minute else '24:00' }}</div>
+    {% elif status == 'busy' %}
+    <div class="status-banner busy">In use: {{ detail.game_name }}{% if detail.organizer %} ({{ detail.organizer }}){% endif %} until {{ detail.end_label }}</div>
+    {% else %}
+    <div class="status-banner closed">The gaming hall is closed right now.</div>
+    {% endif %}
+{% endif %}
+
+<div class="day-tabs">
+    {% for d in days %}
+    <a href="{{ url_for('table_schedule', table_id=table.id, day=d) }}" class="{{ 'active' if d == day else '' }}">{{ d }}{% if d == today %} (today){% endif %}</a>
+    {% endfor %}
+</div>
+
+<div class="strip" aria-hidden="true">
+    {% for seg in segments %}
+    <div class="seg {{ seg.kind }}" style="flex-grow: {{ seg.minutes }};"
+         title="{{ fmt_min(seg.start_min) }}-{{ fmt_min(seg.end_min) }}"></div>
+    {% endfor %}
+</div>
+<div class="strip-ends"><span>{{ fmt_min(open_min) }}</span><span>{{ fmt_min(close_min) }}</span></div>
+
+{% for seg in segments %}
+<div class="slot {{ seg.kind }}">
+    <div class="slot-time">{{ fmt_min(seg.start_min) }} - {{ fmt_min(seg.end_min) }}</div>
+    <div class="slot-detail">
+        {% if seg.kind == 'free' %}
+            <strong>Free</strong> ({{ fmt_duration(seg.minutes) }})
+        {% else %}
+            <strong>{{ seg.booking.game_name }}</strong>
+            {% if seg.booking.organizer %}<small>Organizer: {{ seg.booking.organizer }}</small>{% endif %}
+            {% if seg.booking.multi_day %}<small>Multi-day booking: {{ seg.booking.start_label }} to {{ seg.booking.end_label }}</small>{% endif %}
+        {% endif %}
+    </div>
+</div>
+{% endfor %}
+
+<p class="reserve-hint">To reserve this table for a game, add it to the organizers' game sheet (use the link the organizers gave you).</p>
+{% endblock %}
+
+{% block footer %}
+<p>Table bookings as of {{ as_of }} (refreshes about every minute)</p>
+{% endblock %}

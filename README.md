@@ -27,6 +27,35 @@ This app allows **all players to view their personal schedules concurrently** wi
 - **Printable Schedules**: Print button on player list view for physical copies
 - **No Authentication Required**: Uses public Google Sheets CSV export
 
+## Table Schedules and Open-Table Search
+
+Attendees can scan a QR code on a table to see that table's bookings, and can search for tables that are free during a time window (for pickup games).
+
+- `/table/<id>` - one table's schedule, defaulting to today, with a "free now / in use" banner. Shows game and organizer names (never email addresses).
+- `/tables` - find tables free for a whole window (`?day=Friday&from=14:00&to=18:00&type=2M`). Defaults to the next two hours today. Type codes (e.g. `C`, `2M`, `4L`) come from the Table Usage sheet.
+- Bookings come from the organizers' "Organize a Game" workbook: column A of the **Table Usage** tab lists the tables (rows from `NON_GENERAL_TABLES_START` in `config.py` - `ASL1` - downward are excluded), and the **Games** tab's *Assigned Table* column is authoritative. Setup/teardown time is assumed to be included in the booked start/end times. A multi-day game keeps its table busy for the whole of every day it covers.
+- Data is cached for `TABLE_CACHE_SECONDS` (60s), since people reserve tables by editing the sheet. Open hours per day and the time zone are in `config.py`.
+
+### Configuration (secrets)
+
+That workbook may be editable by anyone with its link, and the CSV export URL contains the same document id, so **treat both URLs as secrets**. Don't commit them or paste them into issues. The app reads them only from environment variables, never renders or logs them, and never writes to the sheet.
+
+```bash
+export TABLE_USAGE_CSV_URL="https://docs.google.com/spreadsheets/d/<id>/export?format=csv&gid=<table-usage-gid>"
+export ORGANIZER_GAMES_CSV_URL="https://docs.google.com/spreadsheets/d/<id>/export?format=csv&gid=<games-gid>"
+```
+
+Locally, put these in a git-ignored `.env` and load it into your shell. `./deploy.sh` forwards them to Cloud Run if they are exported (they then persist across redeploys).
+
+### Printing QR codes
+
+```bash
+pip install -r requirements-tools.txt
+python tools/make_qr.py --base-url https://your-app-url
+```
+
+This writes a `table_qr_codes/` folder containing one single-page PDF per table (named after the table, e.g. `NE02.pdf`) plus `00_ALL_TABLES.pdf` with every table, one per page. Each QR code opens `<base-url>/table/<table id>`. Keep the base URL stable once codes are printed. The table list is read from the Table Usage sheet (so the two sheet env vars must be set); use `--tables NW01,NW02` to name tables yourself instead.
+
 ## Architecture
 
 ```

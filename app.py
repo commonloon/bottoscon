@@ -10,7 +10,8 @@ from datetime import datetime, timedelta
 from urllib.parse import quote, unquote
 from flask import Flask, render_template, request, redirect, url_for, jsonify, g
 import requests
-from config import CONVENTION_START_DATE, CONVENTION_DAYS
+from config import CONVENTION_START_DATE, CONVENTION_DAYS, CONVENTION_HOURS
+import tables as tables_mod
 
 app = Flask(__name__)
 
@@ -327,6 +328,12 @@ def toggle_favourite(player_name):
     return jsonify({'success': True, 'favourited': favourited})
 
 
+def _server_error(message, exc):
+    """Generic 500. requests' exception text embeds the sheet URL, so log only the class."""
+    app.logger.error('%s: %s', message, type(exc).__name__)
+    return f'{message}. Please try again shortly.', 500
+
+
 @app.route('/')
 def index():
     """Home page showing all players"""
@@ -335,7 +342,7 @@ def index():
         players = sorted(player_games.keys())
         return render_template('index.html', players=players, player_count=len(players))
     except Exception as e:
-        return f"Error loading data: {str(e)}", 500
+        return _server_error("Error loading data", e)
 
 
 @app.route('/schedule/<player_name>')
@@ -351,7 +358,7 @@ def player_schedule(player_name):
         games = annotate_viewer_waitlist(games, player_name)
         return render_template('schedule.html', player_name=player_name, games=games)
     except Exception as e:
-        return f"Error loading schedule: {str(e)}", 500
+        return _server_error("Error loading schedule", e)
 
 
 @app.route('/calendar/<player_name>')
@@ -371,7 +378,7 @@ def player_calendar(player_name):
                              get_convention_date=get_convention_date,
                              convention_days=list(CONVENTION_DAYS.keys()))
     except Exception as e:
-        return f"Error loading calendar: {str(e)}", 500
+        return _server_error("Error loading calendar", e)
 
 
 @app.route('/all-games')
@@ -382,7 +389,7 @@ def all_games():
         games = sort_games_chronologically(games)
         return render_template('all_games.html', games=games)
     except Exception as e:
-        return f"Error loading games: {str(e)}", 500
+        return _server_error("Error loading games", e)
 
 
 @app.route('/calendar/all-games')
@@ -396,7 +403,109 @@ def all_games_calendar():
                              get_convention_date=get_convention_date,
                              convention_days=list(CONVENTION_DAYS.keys()))
     except Exception as e:
-        return f"Error loading calendar: {str(e)}", 500
+        return _server_error("Error loading calendar", e)
+
+
+# ---------------------------------------------------------------- tables
+# Table availability pages (QR codes on the tables point at /table/<id>).
+# Never put sheet URLs or exception text in a response: the table workbook
+# may be editable by anyone who has its link.
+
+@app.after_request
+def table_page_headers(response):
+    if request.path.startswith(('/table/', '/tables')):
+        response.headers['Cache-Control'] = 'no-store'
+        response.headers['X-Robots-Tag'] = 'noindex, nofollow'
+    return response
+
+
+def _table_data_or_error():
+    """Return (data, None) or (None, (message, status)) without leaking details."""
+    if not tables_mod.is_configured():
+        return None, ('Table schedules are not set up for this site yet.', 503)
+    try:
+        return tables_mod.get_table_data(), None
+    except tables_mod.TableDataError:
+        return None, ('Table schedules are temporarily unavailable. Please try again shortly.', 503)
+
+
+def _time_options():
+    open_min = min(h[0] for h in CONVENTION_HOURS.values()) * 60
+    close_min = max(h[1] for h in CONVENTION_HOURS.values()) * 60
+    return [tables_mod.fmt_min(m) for m in range(open_min, close_min + 1, 30)]
+
+
+@app.route('/table/<table_id>')
+def table_schedule(table_id):
+    """One table's schedule for a day (defaults to today)."""
+    data, error = _table_data_or_error()
+    if error:
+        return error
+    table = data.table(table_id)
+    if table is None:
+        return 'Table not found', 404
+
+    now = tables_mod.convention_now()
+    days = tables_mod.day_names()
+    day = request.args.get('day', '')
+    if day not in days:
+        day = tables_mod.default_day(now)
+
+    bookings = data.bookings_for(table)
+    status, detail = tables_mod.current_status(bookings, now)
+    segments = tables_mod.day_segments(bookings, day)
+    open_min, close_min = tables_mod.day_window_minutes(day)
+    return render_template('table_schedule.html', table=table, days=days, day=day,
+                           today=tables_mod.todays_convention_day(now),
+                           segments=segments, open_min=open_min, close_min=close_min,
+                           status=status, detail=detail, now=now,
+                           fmt_min=tables_mod.fmt_min, fmt_duration=tables_mod.fmt_duration,
+                           as_of=tables_mod.as_of_label(data.fetched_at))
+
+
+@app.route('/tables')
+def open_tables():
+    """Find tables that are free for a whole time window on a given day."""
+    data, error = _table_data_or_error()
+    if error:
+        return error
+
+    now = tables_mod.convention_now()
+    days = tables_mod.day_names()
+    day = request.args.get('day', '')
+    if day not in days:
+        day = tables_mod.default_day(now)
+    open_min, close_min = tables_mod.day_window_minutes(day)
+
+    notice = None
+    from_min = tables_mod.parse_minutes(request.args.get('from', ''))
+    to_min = tables_mod.parse_minutes(request.args.get('to', ''))
+    if from_min is None or to_min is None:
+        # Default window: starting at the next half hour if it's that day now, else opening.
+        if tables_mod.day_date(day).date() == now.date():
+            now_min = now.hour * 60 + now.minute
+            from_min = min(max(-(-now_min // 30) * 30, open_min), close_min - 30)
+        else:
+            from_min = open_min
+        to_min = min(from_min + 120, close_min)
+    if from_min < open_min or to_min > close_min:
+        notice = (f'{day} is open {tables_mod.fmt_min(open_min)}-{tables_mod.fmt_min(close_min)}; '
+                  'the window was adjusted to fit.')
+        from_min, to_min = max(from_min, open_min), min(to_min, close_min)
+    if to_min <= from_min:
+        notice = 'The end time must be after the start time.'
+        results = []
+    else:
+        results = tables_mod.find_open_tables(data, day, from_min, to_min,
+                                              request.args.get('type', ''))
+
+    return render_template('open_tables.html', days=days, day=day,
+                           from_val=tables_mod.fmt_min(from_min), to_val=tables_mod.fmt_min(to_min),
+                           time_options=_time_options(), types=data.types,
+                           selected_type=request.args.get('type', ''),
+                           results=results, notice=notice, total=len(data.tables),
+                           fmt_min=tables_mod.fmt_min,
+                           as_of=tables_mod.as_of_label(data.fetched_at))
 
 
 @app.route('/api/refresh-cache', methods=['POST'])
@@ -404,9 +513,10 @@ def refresh_cache():
     """Force refresh the cache"""
     try:
         fetch_sheet_data(force_refresh=True)
+        tables_mod.clear_cache()
         return jsonify({'success': True, 'message': 'Schedule data refreshed successfully'})
     except Exception as e:
-        return jsonify({'success': False, 'message': f'Error refreshing: {str(e)}'}), 500
+        return jsonify({'success': False, 'message': 'Error refreshing: the sheet could not be fetched'}), 500
 
 
 if __name__ == '__main__':

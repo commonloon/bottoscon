@@ -53,3 +53,8 @@ htmlcov/
 # Environment
 .env
 .env.local
+
+# Local table-sheet URLs live in .env (see README)
+
+# Generated QR print sheet
+table_qr_codes/

@@ -226,6 +226,7 @@
             <nav>
                 <a href="{{ url_for('index') }}">🏠 All Players</a>
                 <a href="{{ url_for('all_games') }}">📋 All Games</a>
+                <a href="{{ url_for('open_tables') }}">🪑 Open Tables</a>
                 {% block nav_items %}{% endblock %}
                 <div class="refresh-section">
                     <button id="refreshBtn" class="refresh-btn">🔄 Update Schedule</button>
@@ -253,8 +254,10 @@
         </div>
 
         <footer>
+            {% block footer %}
             <p>Data refreshes every hour from the signup sheet</p>
             <p>Having issues? Check that the Google Sheet is publicly accessible</p>
+            {% endblock %}
         </footer>
     </div>
 

@@ -48,10 +48,21 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
+# Table-schedule sheet URLs are secrets (the organizers' workbook may be editable
+# by anyone with the link). They are never stored in the repo: export them in
+# your shell before deploying. Once set on the service they persist across
+# redeploys, so they only need to be exported again when they change.
+ENV_ARGS=()
+if [ -n "${TABLE_USAGE_CSV_URL}" ] && [ -n "${ORGANIZER_GAMES_CSV_URL}" ]; then
+    ENV_ARGS=(--update-env-vars "TABLE_USAGE_CSV_URL=${TABLE_USAGE_CSV_URL},ORGANIZER_GAMES_CSV_URL=${ORGANIZER_GAMES_CSV_URL}")
+else
+    echo "Note: TABLE_USAGE_CSV_URL / ORGANIZER_GAMES_CSV_URL not set in this shell; leaving the service's existing values unchanged."
+fi
+
 # Deploy to Cloud Run
 echo ""
 echo "Deploying to Cloud Run..."
-gcloud run deploy ${SERVICE_NAME} \
+gcloud run deploy ${SERVICE_NAME}     "${ENV_ARGS[@]}" \
     --image ${IMAGE_NAME} \
     --platform managed \
     --region ${REGION} \
