@@ -89,6 +89,34 @@ gcloud run services describe ${SERVICE_NAME} \
     --region ${REGION} \
     --format 'value(status.url)'
 
+# Every deploy leaves behind a Cloud Run revision and a container image, and the
+# images are billed for storage. Count them and, if there are too many, print
+# cleanup instructions. This only counts and prints; it never deletes anything.
+KEEP_VERSIONS=5
+CLEANUP_THRESHOLD=10
+IMAGE_COUNT=$(gcloud container images list-tags ${IMAGE_NAME} --format='get(digest)' 2>/dev/null | grep -c . || true)
+REVISION_COUNT=$(gcloud run revisions list --service ${SERVICE_NAME} --region ${REGION} --format='value(metadata.name)' 2>/dev/null | grep -c . || true)
+echo ""
+echo "Stored versions: ${REVISION_COUNT} Cloud Run revisions, ${IMAGE_COUNT} container images"
+if [ "${IMAGE_COUNT:-0}" -ge ${CLEANUP_THRESHOLD} ] || [ "${REVISION_COUNT:-0}" -ge ${CLEANUP_THRESHOLD} ]; then
+    echo ""
+    echo "!! ${CLEANUP_THRESHOLD} or more old versions are stored. Old container images are billed for storage."
+    echo "   To keep only the newest ${KEEP_VERSIONS} of each, run these (revisions first, then images):"
+    echo ""
+    echo "   gcloud run revisions list --service ${SERVICE_NAME} --region ${REGION} \\"
+    echo "       --sort-by=~metadata.creationTimestamp --format='value(metadata.name)' \\"
+    echo "       | tail -n +$((KEEP_VERSIONS + 1)) | tr -d '\r' \\"
+    echo "       | xargs -r -n1 gcloud run revisions delete --region ${REGION} --quiet"
+    echo ""
+    echo "   gcloud container images list-tags ${IMAGE_NAME} \\"
+    echo "       --sort-by=~timestamp --format='get(digest)' \\"
+    echo "       | tail -n +$((KEEP_VERSIONS + 1)) | tr -d '\r' \\"
+    echo "       | xargs -r -I{} gcloud container images delete ${IMAGE_NAME}@{} --force-delete-tags --quiet"
+    echo ""
+    echo "   (Cloud Run refuses to delete the revision serving traffic, and the newest ${KEEP_VERSIONS} images"
+    echo "   are the ones behind the newest ${KEEP_VERSIONS} revisions, so the live app is not affected.)"
+fi
+
 echo ""
 echo "To view logs:"
 echo "  gcloud run logs read ${SERVICE_NAME} --region ${REGION} --limit 50"
