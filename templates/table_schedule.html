@@ -9,6 +9,7 @@
     .status-banner { padding: 14px 18px; border-radius: 8px; font-size: 1.15em; font-weight: 600; margin: 15px 0; }
     .status-banner.free { background: #d4edda; color: #155724; }
     .status-banner.busy { background: #f8d7da; color: #721c24; }
+    .status-banner.setup { background: #e4e4e4; color: #444; }
     .status-banner.closed { background: #eee; color: #555; }
     .day-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 15px 0; }
     .day-tabs a { padding: 8px 16px; border-radius: 5px; background: #f0f4ff; color: #667eea;
@@ -17,10 +18,12 @@
     .strip { display: flex; height: 28px; border-radius: 5px; overflow: hidden; border: 1px solid #ccc; margin: 10px 0 4px; }
     .strip .seg { min-width: 2px; }
     .strip .seg.free { background: #7bd48a; }
+    .strip .seg.setup { background: #b0b0b0; border-left: 1px solid white; }
     .strip .seg.busy { background: #e57373; border-left: 1px solid white; }
     .strip-ends { display: flex; justify-content: space-between; color: #666; font-size: 0.85em; margin-bottom: 15px; }
     .slot { display: flex; gap: 15px; padding: 12px 14px; margin-bottom: 8px; border-radius: 6px; border-left: 6px solid; }
     .slot.free { background: #f1faf3; border-color: #4caf50; }
+    .slot.setup { background: #f3f3f3; border-color: #9e9e9e; }
     .slot.busy { background: #fdf2f2; border-color: #e57373; }
     .slot-time { min-width: 130px; font-weight: 600; font-variant-numeric: tabular-nums; }
     .slot-detail small { color: #666; display: block; }
@@ -40,6 +43,8 @@
     <div class="status-banner free">Free now, until {{ detail.strftime('%H:%M') if detail.hour or detail.minute else '24:00' }}</div>
     {% elif status == 'busy' %}
     <div class="status-banner busy">In use: {{ detail.game_name }}{% if detail.organizer %} ({{ detail.organizer }}){% endif %} until {{ detail.end_label }}</div>
+    {% elif status == 'setup' %}
+    <div class="status-banner setup">Being set up for {{ detail.game_name }}, game starts {{ detail.start.strftime('%H:%M') }}</div>
     {% else %}
     <div class="status-banner closed">The gaming hall is closed right now.</div>
     {% endif %}
@@ -65,6 +70,9 @@
     <div class="slot-detail">
         {% if seg.kind == 'free' %}
             <strong>Free</strong> ({{ fmt_duration(seg.minutes) }})
+        {% elif seg.kind == 'setup' %}
+            <strong>Set-up</strong> for {{ seg.booking.game_name }} ({{ fmt_duration(seg.minutes) }})
+            <small>Table unavailable; game starts {{ seg.booking.start.strftime('%H:%M') }}</small>
         {% else %}
             <strong>{{ seg.booking.game_name }}</strong>
             {% if seg.booking.organizer %}<small>Organizer: {{ seg.booking.organizer }}</small>{% endif %}

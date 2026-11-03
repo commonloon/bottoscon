@@ -284,10 +284,26 @@
                     status: game.status,
                     playerCount: game.players.length,
                     players: game.players,
-                    viewerWaitlisted: game.viewer_waitlisted
+                    viewerWaitlisted: game.viewer_waitlisted,
+                    setupMinutes: game.setup_minutes || 0
                 }
             };
         });
+
+        // Grey "set-up" blocks just before games the viewed player organizes
+        const setupEvents = events
+            .filter(e => e.extendedProps.setupMinutes > 0)
+            .map(e => {
+                const start = new Date(e.start);
+                return {
+                    title: 'Set-up',
+                    start: new Date(start.getTime() - e.extendedProps.setupMinutes * 60000),
+                    end: start,
+                    display: 'background',
+                    color: '#9e9e9e',
+                    classNames: ['setup-block']
+                };
+            });
 
         // Open hours per day [first hour, end hour] (generated from server config).
         // The grid spans the earliest open to the latest close; each day's closed
@@ -330,7 +346,7 @@
             },
             slotMinTime: pad2(gridOpen) + ':00',
             slotMaxTime: pad2(gridClose) + ':00',
-            events: events,
+            events: events.concat(setupEvents),
             eventContent: function(arg) {
                 const props = arg.event.extendedProps;
                 const startTime = arg.event.start.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});

@@ -30,8 +30,8 @@ GAME_HEADER = ['Game ID', 'Organizer', 'Game name', 'Format', 'To Do', 'Game Des
                'End Day', 'End Time (24 hour clock)']
 
 
-def game(gid, organizer, name, table, start_day, start, end_day, end):
-    return [gid, organizer, name, '', '', '', '', '', '', '', table, '0',
+def game(gid, organizer, name, table, start_day, start, end_day, end, setup='0'):
+    return [gid, organizer, name, '', '', '', '', '', '', '', table, setup,
             start_day, start, end_day, end]
 
 
@@ -101,6 +101,82 @@ class TestSegments:
         saturday = t.day_segments(data.bookings['SE09'], 'Saturday')
         assert friday[-1]['kind'] == 'busy' and friday[-1]['end_min'] == 24 * 60
         assert saturday[0]['kind'] == 'free' and saturday[0]['start_min'] == 9 * 60
+
+
+class TestSetupTime:
+    @pytest.fixture
+    def setup_data(self):
+        tables = t.parse_tables(USAGE_ROWS)
+        rows = [GAME_HEADER,
+                game('1', 'A <a@x.com>', 'Big Game', 'NW01', 'Friday', '14:00', 'Friday', '16:00', '45'),
+                game('2', 'B <b@x.com>', 'Next', 'NW01', 'Friday', '16:15', 'Friday', '17:00', '30'),
+                game('3', 'C <c@x.com>', 'Junk', 'NE05', 'Friday', '14:00', 'Friday', '15:00', 'abc'),
+                game('4', 'D <d@x.com>', 'Early', 'SE09', 'Friday', '09:10', 'Friday', '10:00', '45')]
+        return t.TableData(tables=tables, bookings=t.parse_bookings(rows, tables), fetched_at=0)
+
+    def test_setup_segment_precedes_game(self, setup_data):
+        segs = t.day_segments(setup_data.bookings['NW01'], 'Friday')
+        assert [(s['kind'], s['start_min'], s['end_min']) for s in segs[:4]] == [
+            ('free', 9 * 60, 13 * 60 + 15), ('setup', 13 * 60 + 15, 14 * 60),
+            ('busy', 14 * 60, 16 * 60), ('setup', 16 * 60, 16 * 60 + 15)]
+
+    def test_setup_is_clipped_to_previous_game_and_opening(self, setup_data):
+        nw01 = t.day_segments(setup_data.bookings['NW01'], 'Friday')
+        assert [(s['kind'], s['start_min']) for s in nw01[3:]] == [
+            ('setup', 16 * 60), ('busy', 16 * 60 + 15), ('free', 17 * 60)]
+        se09 = t.day_segments(setup_data.bookings['SE09'], 'Friday')
+        assert (se09[0]['kind'], se09[0]['start_min']) == ('setup', 9 * 60)
+
+    def test_unreadable_setup_is_zero(self, setup_data):
+        assert setup_data.bookings['NE05'][0].setup_minutes == 0
+
+    def test_table_unavailable_during_setup(self, setup_data):
+        def ids(a, b):
+            return [r['table'].id for r in t.find_open_tables(setup_data, 'Friday', a, b)]
+        assert 'NW01' not in ids(13 * 60 + 30, 14 * 60)
+        assert 'NW01' in ids(12 * 60, 13 * 60 + 15)
+        results = t.find_open_tables(setup_data, 'Friday', 12 * 60, 13 * 60)
+        assert [r['free_until_min'] for r in results if r['table'].id == 'NW01'] == [13 * 60 + 15]
+
+    def test_current_status_setup(self, setup_data):
+        nw01 = setup_data.bookings['NW01']
+        assert t.current_status(nw01, datetime(2026, 11, 6, 13, 30))[0] == 'setup'
+        status, until = t.current_status(nw01, datetime(2026, 11, 6, 13, 0))
+        assert (status, until) == ('free', datetime(2026, 11, 6, 13, 15))
+
+
+class TestOrganizerSetup:
+    GAMES = [{'id': '1', 'players': ['Org', 'Pat']},
+             {'id': '2', 'players': ['Pat', 'Org']},
+             {'id': '9', 'players': ['Org']}]
+
+    def test_setup_lookup_skips_zero(self, data):
+        tables = t.parse_tables(USAGE_ROWS)
+        rows = [GAME_HEADER,
+                game('1', 'A <a@x.com>', 'G1', 'NW01', 'Friday', '14:00', 'Friday', '16:00', '45'),
+                game('2', 'B <b@x.com>', 'G2', 'NE05', 'Friday', '14:00', 'Friday', '16:00', '0')]
+        d = t.TableData(tables=tables, bookings=t.parse_bookings(rows, tables))
+        assert t.setup_minutes_by_game(d) == {'1': 45}
+
+    def test_only_organizer_gets_setup(self, monkeypatch):
+        monkeypatch.setattr(t, 'is_configured', lambda: True)
+        monkeypatch.setattr(t, 'get_table_data', lambda force=False: object())
+        monkeypatch.setattr(t, 'setup_minutes_by_game', lambda d: {'1': 45, '2': 30})
+        out = app_module.annotate_organizer_setup(self.GAMES, 'Org')
+        assert [g['setup_minutes'] for g in out] == [45, 0, 0]
+
+    def test_no_table_data_means_no_setup(self, monkeypatch):
+        monkeypatch.setattr(t, 'is_configured', lambda: False)
+        out = app_module.annotate_organizer_setup(self.GAMES, 'Org')
+        assert [g['setup_minutes'] for g in out] == [0, 0, 0]
+
+    def test_table_data_failure_is_swallowed(self, monkeypatch):
+        def boom(force=False):
+            raise t.TableDataError('down')
+        monkeypatch.setattr(t, 'is_configured', lambda: True)
+        monkeypatch.setattr(t, 'get_table_data', boom)
+        out = app_module.annotate_organizer_setup(self.GAMES, 'Org')
+        assert [g['setup_minutes'] for g in out] == [0, 0, 0]
 
 
 class TestSearchAndStatus:

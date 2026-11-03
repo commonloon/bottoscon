@@ -189,24 +189,31 @@ class TestWaitlistParsing:
 class TestGameComparison:
     """Test comparison between CSV source and parsed games."""
 
-    def test_all_csv_games_are_in_parsed_games(self, csv_games, parsed_games):
-        """TC-014: All CSV Games Are in Parsed Games"""
-        parsed_names = {g['name'] for g in parsed_games}
-        csv_names = {g['name'] for g in csv_games}
+    def test_parser_keeps_every_valid_game(self, monkeypatch):
+        """TC-014: Parser Keeps Every Valid Game
 
-        missing = csv_names - parsed_names
-        assert not missing, (
-            f"Found {len(missing)} games in CSV that are missing from parsed games: {missing}"
-        )
+        Uses synthetic sheet rows, so it does not depend on the live sheet or on
+        a saved export that would go stale. Every row with a convention start
+        day and a game name must be parsed; rows lacking either are skipped.
+        """
+        header = ['Game Name', 'Start Day', 'Start Time (24 hour clock)',
+                  'End Time (24 hour clock)', '1 / Organizer', '2', 'Condensed Players List']
+        day0, day1 = list(CONVENTION_DAYS)[:2]
+        rows = [
+            ['Instructions: organizers fill in below'],
+            header,
+            ['Game A', day0, '10:00', '12:00', 'Org One', 'Pat', 'Org One, Pat'],
+            ['Game B', day1, '14:00:00', '16:00:00', 'Org Two', '', 'Org Two'],
+            ['Game C', day1, '09:00', '10:00', 'Org Three', '', 'Org Three'],
+            ['No Day Game', '', '10:00', '12:00', 'Org Four', '', 'Org Four'],
+            ['Bad Day Game', 'Monday', '10:00', '12:00', 'Org Five', '', 'Org Five'],
+            ['', day0, '10:00', '12:00', 'Org Six', '', 'Org Six'],
+        ]
+        monkeypatch.setattr(app_module, 'fetch_sheet_data', lambda force_refresh=False: rows)
 
-    def test_no_extra_games_in_parsed(self, csv_games, parsed_games):
-        """Verify no games are present in parsed that shouldn't be"""
-        parsed_names = {g['name'] for g in parsed_games}
-        csv_names = {g['name'] for g in csv_games}
+        games, _ = app_module.parse_games_and_players()
 
-        extra = parsed_names - csv_names
-        if extra:
-            print(f"\nWarning: Found {len(extra)} extra games in parsed data: {extra}")
+        assert sorted(g['name'] for g in games) == ['Game A', 'Game B', 'Game C']
 
 
 class TestCacheAndAPI:

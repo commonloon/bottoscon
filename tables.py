@@ -60,6 +60,12 @@ class Booking:
     organizer: str
     start: datetime
     end: datetime
+    setup_minutes: int = 0  # pre-game set-up; the table is unavailable from block_start
+
+    @property
+    def block_start(self):
+        """When the table stops being available: the start of set-up, else the game start."""
+        return self.start - timedelta(minutes=self.setup_minutes)
 
     @property
     def start_label(self):
@@ -141,6 +147,14 @@ def clean_organizer(text):
     return re.sub(r'\s*<[^>]*>', '', text or '').strip()
 
 
+def parse_setup_minutes(text):
+    """'45' -> 45; blank, negative or unreadable -> 0."""
+    try:
+        return max(0, int(float((text or '').strip())))
+    except ValueError:
+        return 0
+
+
 def parse_tables(rows):
     """Table list from the Table Usage tab. Stops at the first non-general table or blank."""
     header_idx = None
@@ -206,11 +220,12 @@ def parse_bookings(rows, tables):
             organizer=clean_organizer(_get(row, cols, 'Organizer')),
             start=start,
             end=end,
+            setup_minutes=parse_setup_minutes(_get(row, cols, 'Pre-Game Set-Up Time Needed (m)')),
         ))
     if skipped:
         logger.warning('%d table assignment(s) skipped: unreadable day/time', skipped)
     for lst in bookings.values():
-        lst.sort(key=lambda b: (b.start, b.end))
+        lst.sort(key=lambda b: (b.block_start, b.start, b.end))
     return bookings
 
 
@@ -307,6 +322,13 @@ def as_of_label(timestamp):
     return datetime.fromtimestamp(timestamp, ZoneInfo(CONVENTION_TZ)).strftime('%H:%M')
 
 
+def setup_minutes_by_game(data):
+    """Game ID -> pre-game set-up minutes, for assigned games that need any."""
+    return {b.game_id: b.setup_minutes
+            for lst in data.bookings.values() for b in lst
+            if b.game_id and b.setup_minutes > 0}
+
+
 def day_names():
     return list(CONVENTION_DAYS)
 
@@ -363,7 +385,8 @@ def _window(day_name):
 
 def day_segments(bookings, day_name):
     """
-    Cover the day's open hours with alternating free/busy segments. A booking
+    Cover the day's open hours with free/setup/busy segments. A 'setup' segment
+    is the pre-game set-up time immediately before a game starts. A booking
     spanning several days (or overnight) is clipped to this day's hours, so a
     multi-day game shows the table busy for the whole of each day it covers.
     """
@@ -379,12 +402,18 @@ def day_segments(bookings, day_name):
                          'minutes': mins(e) - mins(s), 'booking': booking})
 
     for b in bookings:
-        if b.end <= cursor or b.start >= close_dt:
+        if b.end <= cursor or b.block_start >= close_dt:
             continue
-        if b.start > cursor:
-            add('free', cursor, b.start)
+        if b.block_start > cursor:
+            add('free', cursor, b.block_start)
+            cursor = b.block_start
+        if b.start > cursor:  # set-up, clipped to the open hours / previous booking
+            add('setup', cursor, min(b.start, close_dt), b)
+            cursor = min(b.start, close_dt)
+        if cursor >= close_dt:
+            continue
         seg_end = min(b.end, close_dt)
-        add('busy', max(b.start, cursor), seg_end, b)
+        add('busy', cursor, seg_end, b)
         cursor = seg_end
     if cursor < close_dt:
         add('free', cursor, close_dt)
@@ -394,6 +423,7 @@ def day_segments(bookings, day_name):
 def current_status(bookings, now):
     """
     Status at `now`: ('busy', booking), ('free', free_until_datetime), or
+    ('setup', booking) while a game's pre-game set-up is under way,
     ('closed', next_open_datetime_or_None) outside the convention's open hours.
     """
     for name in day_names():
@@ -402,7 +432,9 @@ def current_status(bookings, now):
             for b in bookings:
                 if b.start <= now < b.end:
                     return 'busy', b
-            upcoming = [b.start for b in bookings if now < b.start < close_dt]
+                if b.block_start <= now < b.start:
+                    return 'setup', b
+            upcoming = [b.block_start for b in bookings if now < b.block_start < close_dt]
             return 'free', min([close_dt] + upcoming)
     opens = [_window(n)[1] for n in day_names() if _window(n)[1] > now]
     return 'closed', (min(opens) if opens else None)
@@ -421,9 +453,9 @@ def find_open_tables(data, day_name, from_min, to_min, table_type=''):
         if table_type and table.type != table_type:
             continue
         bookings = data.bookings_for(table)
-        if any(b.start < w_end and b.end > w_start for b in bookings):
+        if any(b.block_start < w_end and b.end > w_start for b in bookings):
             continue
-        later = [b.start for b in bookings if w_end <= b.start < close_dt]
+        later = [b.block_start for b in bookings if w_end <= b.block_start < close_dt]
         free_until = min([close_dt] + later)
         results.append({
             'table': table,

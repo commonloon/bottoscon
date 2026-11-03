@@ -250,6 +250,26 @@ def annotate_viewer_waitlist(games, player_name):
     ]
 
 
+def annotate_organizer_setup(games, player_name):
+    """
+    Shallow-copy each game dict, adding 'setup_minutes' (pre-game set-up from
+    the organizers' sheet) for games player_name organizes. The organizer is
+    the first entry in the game's player list. Without table data (not
+    configured, or the sheet is unreachable) games are returned with no setup.
+    """
+    setup = {}
+    try:
+        if tables_mod.is_configured():
+            setup = tables_mod.setup_minutes_by_game(tables_mod.get_table_data())
+    except Exception:
+        pass  # set-up blocks are an extra; never break the calendar over them
+    return [
+        {**game, 'setup_minutes': setup.get(game['id'], 0)
+         if game['players'] and game['players'][0] == player_name else 0}
+        for game in games
+    ]
+
+
 def sort_games_chronologically(games):
     """Sort games by day and time"""
     day_order = {day: i + 1 for i, day in enumerate(CONVENTION_DAYS.keys())}
@@ -371,7 +391,7 @@ def player_calendar(player_name):
             return f"Player '{player_name}' not found", 404
 
         games = sort_games_chronologically(player_games[player_name])
-        games = annotate_viewer_waitlist(games, player_name)
+        games = annotate_organizer_setup(annotate_viewer_waitlist(games, player_name), player_name)
         return render_template('calendar.html',
                              player_name=player_name,
                              games=games,

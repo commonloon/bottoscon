@@ -33,7 +33,7 @@ Attendees can scan a QR code on a table to see that table's bookings, and can se
 
 - `/table/<id>` - one table's schedule, defaulting to today, with a "free now / in use" banner. Shows game and organizer names (never email addresses).
 - `/tables` - find tables free for a whole window (`?day=Friday&from=14:00&to=18:00&type=2M`). Defaults to the next two hours today. Type codes (e.g. `C`, `2M`, `4L`) come from the Table Usage sheet.
-- Bookings come from the organizers' "Organize a Game" workbook: column A of the **Table Usage** tab lists the tables (rows from `NON_GENERAL_TABLES_START` in `config.py` - `ASL1` - downward are excluded), and the **Games** tab's *Assigned Table* column is authoritative. Setup/teardown time is assumed to be included in the booked start/end times. A multi-day game keeps its table busy for the whole of every day it covers.
+- Bookings come from the organizers' "Organize a Game" workbook: column A of the **Table Usage** tab lists the tables (rows from `NON_GENERAL_TABLES_START` in `config.py` - `ASL1` - downward are excluded), and the **Games** tab's *Assigned Table* column is authoritative. The *Pre-Game Set-Up Time Needed (m)* column is shown as a grey block just before the game starts, and the table counts as unavailable during it; teardown is assumed to be included in the booked end time. The same setup time is also shown as a grey block on the game organizer's own personal calendar (matched by Game ID). A multi-day game keeps its table busy for the whole of every day it covers.
 - Data is cached for `TABLE_CACHE_SECONDS` (60s), since people reserve tables by editing the sheet. Open hours per day and the time zone are in `config.py`.
 
 ### Configuration (secrets)
