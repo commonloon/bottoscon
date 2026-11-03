@@ -289,6 +289,20 @@
             };
         });
 
+        // Open hours per day [first hour, end hour] (generated from server config).
+        // The grid spans the earliest open to the latest close; each day's closed
+        // hours are greyed out as non-business time.
+        const dayHours = {{ convention_hours|tojson }};
+        const dowByDay = {Sunday: 0, Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6};
+        const pad2 = n => String(n).padStart(2, '0');
+        const gridOpen = Math.min(...Object.values(dayHours).map(h => h[0]));
+        const gridClose = Math.max(...Object.values(dayHours).map(h => h[1]));
+        const businessHours = Object.entries(dayHours).map(([day, h]) => ({
+            daysOfWeek: [dowByDay[day]],
+            startTime: pad2(h[0]) + ':00',
+            endTime: pad2(h[1]) + ':00'
+        }));
+
         // Set initial date to the convention start date
         const initialDate = dayMap['{{ convention_days[0] }}'];
 
@@ -306,11 +320,7 @@
                     duration: { days: {{ convention_days|length }} }
                 }
             },
-            businessHours: {
-                daysOfWeek: [4, 5, 6, 0],
-                startTime: '09:00',
-                endTime: '24:00'
-            },
+            businessHours: businessHours,
             slotLabelInterval: '00:30',
             slotLabelFormat: {
                 hour: 'numeric',
@@ -318,8 +328,8 @@
                 meridiem: 'short',
                 omitZeroMinute: false
             },
-            slotMinTime: '09:00',
-            slotMaxTime: '24:00',
+            slotMinTime: pad2(gridOpen) + ':00',
+            slotMaxTime: pad2(gridClose) + ':00',
             events: events,
             eventContent: function(arg) {
                 const props = arg.event.extendedProps;

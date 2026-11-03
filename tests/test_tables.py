@@ -83,7 +83,7 @@ class TestSegments:
     def test_single_day_segments_cover_open_hours(self, data):
         segs = t.day_segments(data.bookings['NW01'], 'Friday')
         assert [(s['kind'], s['start_min'], s['end_min']) for s in segs] == [
-            ('free', 8 * 60, 10 * 60), ('busy', 10 * 60, 12 * 60),
+            ('free', 9 * 60, 10 * 60), ('busy', 10 * 60, 12 * 60),
             ('free', 12 * 60, 23 * 60), ('busy', 23 * 60, 23 * 60 + 30),
             ('free', 23 * 60 + 30, 24 * 60)]
 
@@ -94,13 +94,13 @@ class TestSegments:
             [s['kind'] for s in thursday] == ['free', 'busy']
         assert [s['kind'] for s in saturday] == ['busy']
         assert [s['kind'] for s in sunday] == ['busy', 'free']
-        assert sunday[1]['end_min'] == 19 * 60   # Sunday closes at 19:00
+        assert sunday[1]['end_min'] == 17 * 60   # Sunday closes at 17:00
 
     def test_overnight_game_splits_across_days(self, data):
         friday = t.day_segments(data.bookings['SE09'], 'Friday')
         saturday = t.day_segments(data.bookings['SE09'], 'Saturday')
         assert friday[-1]['kind'] == 'busy' and friday[-1]['end_min'] == 24 * 60
-        assert saturday[0]['kind'] == 'busy' and saturday[0]['end_min'] == 9 * 60
+        assert saturday[0]['kind'] == 'free' and saturday[0]['start_min'] == 9 * 60
 
 
 class TestSearchAndStatus:
@@ -113,7 +113,7 @@ class TestSearchAndStatus:
 
     def test_adjacent_booking_does_not_conflict(self, data):
         assert 'NW01' in self.ids(t.find_open_tables(data, 'Friday', 12 * 60, 14 * 60))
-        assert 'NW01' in self.ids(t.find_open_tables(data, 'Friday', 8 * 60, 10 * 60))
+        assert 'NW01' in self.ids(t.find_open_tables(data, 'Friday', 9 * 60, 10 * 60))
 
     def test_type_filter_and_free_until(self, data):
         results = t.find_open_tables(data, 'Friday', 12 * 60, 14 * 60, table_type='2M')
@@ -129,7 +129,7 @@ class TestSearchAndStatus:
         assert t.current_status(nw01, datetime(2026, 11, 6, 11, 0))[0] == 'busy'
         status, until = t.current_status(nw01, datetime(2026, 11, 6, 12, 0))
         assert (status, until) == ('free', datetime(2026, 11, 6, 23, 0))
-        assert t.current_status(nw01, datetime(2026, 11, 6, 3, 0)) == ('closed', datetime(2026, 11, 6, 8, 0))
+        assert t.current_status(nw01, datetime(2026, 11, 6, 3, 0)) == ('closed', datetime(2026, 11, 6, 9, 0))
 
     def test_default_day(self):
         assert t.default_day(datetime(2026, 11, 7, 15, 0)) == 'Saturday'

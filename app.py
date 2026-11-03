@@ -376,7 +376,8 @@ def player_calendar(player_name):
                              player_name=player_name,
                              games=games,
                              get_convention_date=get_convention_date,
-                             convention_days=list(CONVENTION_DAYS.keys()))
+                             convention_days=list(CONVENTION_DAYS.keys()),
+                             convention_hours=CONVENTION_HOURS)
     except Exception as e:
         return _server_error("Error loading calendar", e)
 
@@ -401,7 +402,8 @@ def all_games_calendar():
         return render_template('all_games_calendar.html',
                              games=games,
                              get_convention_date=get_convention_date,
-                             convention_days=list(CONVENTION_DAYS.keys()))
+                             convention_days=list(CONVENTION_DAYS.keys()),
+                             convention_hours=CONVENTION_HOURS)
     except Exception as e:
         return _server_error("Error loading calendar", e)
 

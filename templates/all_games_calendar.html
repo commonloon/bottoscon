@@ -356,6 +356,10 @@
     let calendar;
     let currentDay = '{{ convention_days[0] }}';
 
+    // Open hours per day [first hour, end hour] (generated from server config)
+    const dayHours = {{ convention_hours|tojson }};
+    const pad2 = n => String(n).padStart(2, '0');
+
     // Date mapping (generated from server config)
     const dayMap = {
         {% for day in convention_days %}'{{ day }}': '{{ get_convention_date(day) }}'{% if not loop.last %},{% endif %}
@@ -451,8 +455,8 @@
                 meridiem: 'short',
                 omitZeroMinute: false
             },
-            slotMinTime: '09:00',
-            slotMaxTime: '24:00',
+            slotMinTime: pad2(dayHours[day][0]) + ':00',
+            slotMaxTime: pad2(dayHours[day][1]) + ':00',
             events: dayEvents,
             eventClick: function(info) {
                 showGameDetailPanel(info.event);

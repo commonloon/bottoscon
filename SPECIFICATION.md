@@ -67,7 +67,7 @@ BottosCon is a Flask web application that displays game signup information and s
   - Game title
   - Time range
   - Table location
-- Time grid showing 9 AM to midnight
+- Time grid showing each day's open hours (Thu 10 AM, Fri/Sat 9 AM, to midnight; Sun 9 AM to 5 PM), from `CONVENTION_HOURS` in `config.py`
 
 **Printing**: Landscape layout optimized for printing player schedules
 
@@ -100,7 +100,7 @@ BottosCon is a Flask web application that displays game signup information and s
 - FullCalendar showing all games for that day
 - Color-coded by status (green for OPEN, red for FULL)
 - Game details on hover
-- Time grid showing 9 AM to midnight
+- Time grid showing each day's open hours (Thu 10 AM, Fri/Sat 9 AM, to midnight; Sun 9 AM to 5 PM), from `CONVENTION_HOURS` in `config.py`
 
 **Printing**: Portrait layout optimized for printing full schedule
 
